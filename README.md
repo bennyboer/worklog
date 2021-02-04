@@ -8,7 +8,7 @@ Simple CLI application written in Rust for me to be able to log times for work.
 ## Usage
 
 Currently we only have a command line interface and no pre-built binaries.
-So you need to build the application yourself using a Rust toolchain (Which we do not cover here).
+So you need to build the application yourself using a Rust toolchain (Which we do not cover here -> See [here](https://www.rust-lang.org/).
 
 Build the application with `cargo build --release` and find the built executable under `target/release/` named `cli.exe` or just `cli` depending on your platform.
 Place the executable file somewhere you prefer and add it to your `PATH` environment variable.
