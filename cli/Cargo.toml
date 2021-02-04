@@ -1,0 +1,11 @@
+[package]
+name = "cli"
+version = "0.1.0"
+authors = ["Benjamin Eder <barny.eder@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+cmd-args = "0.2.0"
+persistence = { path = "../persistence" }
+chrono = "0.4.19"
+colorful = "0.2.1"

@@ -1,0 +1,7 @@
+[package]
+name = "ui"
+version = "0.1.0"
+authors = ["Benjamin Eder <barny.eder@gmail.com>"]
+edition = "2018"
+
+[dependencies]
