@@ -1,6 +1,7 @@
 use crate::command::command::Command;
 use crate::util;
 use cmd_args::{arg, option, Group};
+use persistence::work_item::Status;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
@@ -42,10 +43,11 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
     let tags: Vec<String> = tags_str.split(",").map(|s| s.trim().to_owned()).collect();
     let time_taken = util::parse_duration(time_taken_str).unwrap();
 
-    let entry = persistence::entry::LogEntry::new(
+    let entry = persistence::work_item::WorkItem::new(
         description.to_owned(),
         HashSet::from_iter(tags.into_iter()),
         time_taken,
+        Status::Done,
     );
 
     persistence::log_entry(entry).unwrap();

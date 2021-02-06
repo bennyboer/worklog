@@ -1,42 +1,62 @@
+use crate::work_item::Status;
 use chrono::Utc;
 use std::collections::HashSet;
 
 #[derive(Debug)]
-pub struct LogEntry {
-    /// Description of the work log entry.
+pub struct WorkItem {
+    /// ID of the work item (only present when already stored in the database).
+    id: Option<i32>,
+    /// Description of the work item.
     description: String,
-    /// Tags to further classify the log entry.
+    /// Tags to further classify the work item.
     tags: HashSet<String>,
-    /// Time spent on the task (in seconds).
+    /// Time spent on the work item (in seconds).
     time_taken: i32,
-    /// Timestamp of when the task was entered into the system.
+    /// Status of the work item.
+    status: Status,
+    /// Timestamp of when the work item was entered into the system.
     timestamp: i64,
 }
 
-impl LogEntry {
-    /// Create a new log entry.
-    pub fn new(description: String, tags: HashSet<String>, time_taken: i32) -> LogEntry {
-        LogEntry {
+impl WorkItem {
+    /// Create a new log work_item.
+    pub fn new(
+        description: String,
+        tags: HashSet<String>,
+        time_taken: i32,
+        status: Status,
+    ) -> WorkItem {
+        WorkItem {
+            id: None,
             description,
             tags,
             time_taken,
+            status,
             timestamp: Utc::now().timestamp_millis(),
         }
     }
 
-    /// Create a new log entry.
+    /// Create a new log work_item for internal use.
     pub fn new_internal(
+        id: i32,
         description: String,
         tags: HashSet<String>,
         time_taken: i32,
+        status: Status,
         timestamp: i64,
-    ) -> LogEntry {
-        LogEntry {
+    ) -> WorkItem {
+        WorkItem {
+            id: Some(id),
             description,
             tags,
             time_taken,
+            status,
             timestamp,
         }
+    }
+
+    pub fn id(&self) -> Option<i32> {
+        return self.id;
     }
 
     pub fn description(&self) -> &String {
@@ -56,6 +76,10 @@ impl LogEntry {
 
     pub fn timestamp(&self) -> i64 {
         return self.timestamp;
+    }
+
+    pub fn status(&self) -> &Status {
+        return &self.status;
     }
 
     pub fn push_tag(&mut self, tag: String) {

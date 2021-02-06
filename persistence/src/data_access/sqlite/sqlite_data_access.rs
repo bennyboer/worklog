@@ -5,11 +5,12 @@ use rusqlite::{params, Connection, Rows, NO_PARAMS};
 
 use crate::data_access::sqlite::patch::Patcher;
 use crate::data_access::DataAccess;
-use crate::entry::LogEntry;
+use crate::work_item::{Status, WorkItem};
 use std::collections::{HashMap, HashSet};
+use std::str::FromStr;
 
 /// Latest database version to patch to.
-const LATEST_VERSION: i32 = 1;
+const LATEST_VERSION: i32 = 2;
 
 /// Directory under the HOME directory of the current user where
 /// to store the logs database.
@@ -98,16 +99,21 @@ impl SQLiteDataAccess {
 }
 
 impl DataAccess for SQLiteDataAccess {
-    fn log_entry(&mut self, entry: LogEntry) -> Result<(), Box<dyn Error>> {
+    fn log_item(&mut self, entry: WorkItem) -> Result<(), Box<dyn Error>> {
         let transaction = self.connection.transaction()?;
 
-        // Insert log entry information
+        // Insert log work_item information
         transaction.execute(
-            "INSERT INTO logs (description, time_taken, timestamp) VALUES (?1, ?2, ?3)",
-            params![entry.description(), entry.time_taken(), entry.timestamp()],
+            "INSERT INTO logs (description, time_taken, timestamp, status) VALUES (?1, ?2, ?3, ?4)",
+            params![
+                entry.description(),
+                entry.time_taken(),
+                entry.timestamp(),
+                format!("{}", entry.status())
+            ],
         )?;
 
-        // Check ID of the new log entry
+        // Check ID of the new log work_item
         let id: i32 =
             transaction.query_row("SELECT last_insert_rowid()", NO_PARAMS, |row| row.get(0))?;
 
@@ -124,38 +130,50 @@ impl DataAccess for SQLiteDataAccess {
         Ok(())
     }
 
-    fn list_entries(&self) -> Result<Vec<LogEntry>, Box<dyn Error>> {
+    fn list_items(&self) -> Result<Vec<WorkItem>, Box<dyn Error>> {
         let mut statement = self.connection.prepare(
             "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, log_tags.tag \
             FROM logs, log_tags \
             WHERE logs.id = log_tags.log_id",
         )?;
 
-        return rows_to_entries(statement.query(NO_PARAMS)?);
+        return rows_to_items(statement.query(NO_PARAMS)?);
     }
 
-    fn filter_entries(
+    fn filter_items(
         &self,
         from_timestamp: i64,
         to_timestamp: i64,
-    ) -> Result<Vec<LogEntry>, Box<dyn Error>> {
+    ) -> Result<Vec<WorkItem>, Box<dyn Error>> {
         let mut statement = self.connection.prepare(
-            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, log_tags.tag \
+            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, log_tags.tag \
             FROM logs, log_tags \
             WHERE logs.id = log_tags.log_id AND logs.timestamp >= ?1 AND logs.timestamp < ?2",
         )?;
 
-        return rows_to_entries(statement.query(params![from_timestamp, to_timestamp])?);
+        return rows_to_items(statement.query(params![from_timestamp, to_timestamp])?);
+    }
+
+    fn find_item_by_id(&self, id: i32) -> Result<Option<WorkItem>, Box<dyn Error>> {
+        let mut statement = self.connection.prepare(
+            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, log_tags.tag \
+            FROM logs, log_tags \
+            WHERE logs.id = log_tags.log_id AND logs.id = ?1",
+        )?;
+
+        let mut items = rows_to_items(statement.query(params![id])?)?;
+
+        Ok(items.pop())
     }
 }
 
 /// Fetch all log entries from the passed rows.
-fn rows_to_entries(mut rows: Rows) -> Result<Vec<LogEntry>, Box<dyn Error>> {
-    let mut entry_map = HashMap::<i32, LogEntry>::new();
+fn rows_to_items(mut rows: Rows) -> Result<Vec<WorkItem>, Box<dyn Error>> {
+    let mut entry_map = HashMap::<i32, WorkItem>::new();
 
     while let Some(row) = rows.next()? {
         let id: i32 = row.get(0)?;
-        let tag = row.get(4)?;
+        let tag = row.get(5)?;
 
         if entry_map.contains_key(&id) {
             let entry = entry_map.get_mut(&id).unwrap();
@@ -164,11 +182,20 @@ fn rows_to_entries(mut rows: Rows) -> Result<Vec<LogEntry>, Box<dyn Error>> {
             let description = row.get(1)?;
             let time_taken = row.get(2)?;
             let timestamp = row.get(3)?;
+            let status: String = row.get(4)?;
 
             let mut tag_set = HashSet::new();
             tag_set.insert(tag);
 
-            let entry = LogEntry::new_internal(description, tag_set, time_taken, timestamp);
+            let entry = WorkItem::new_internal(
+                id,
+                description,
+                tag_set,
+                time_taken,
+                Status::from_str(&status)
+                    .expect("Status string in database table logs could not be interpreted"),
+                timestamp,
+            );
 
             entry_map.insert(id, entry);
         }

@@ -48,7 +48,7 @@ fn execute(args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
 fn export_to_markdown(file_path: &str) {
     let mut data = String::new();
 
-    let entries = persistence::list_entries().unwrap();
+    let entries = persistence::list_items().unwrap();
     for entry in &entries {
         data.push_str(&format!(
             "- {} ({}), took {} minutes\n",

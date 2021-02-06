@@ -24,7 +24,7 @@ impl Command for ListCommand {
             option::Type::Str {
                 default: String::from("today"),
             },
-            "Filter by a date ('today' (default), 'yesterday', '2020-02-20' (yyyy-MM-dd))",
+            "Filter by a date ('today' (default), 'yesterday', '2020-02-20' (yyyy-MM-dd)) or work item ID",
         ))
     }
 
@@ -42,13 +42,22 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
     let all: bool = options.get("all").map_or(false, |v| v.bool().unwrap());
 
     let mut entries = match all {
-        true => persistence::list_entries().unwrap(),
+        true => persistence::list_items().unwrap(),
         false => {
             let filter: &str = options.get("filter").map_or("today", |v| v.str().unwrap());
 
-            let (from_timestamp, to_timestamp) = filter_keyword_to_time_range(filter);
+            // Check if filter string is a work item ID
+            match filter.parse::<i32>() {
+                Ok(id) => persistence::find_item_by_id(id)
+                    .unwrap()
+                    .map_or(Vec::new(), |v| vec![v]),
+                Err(_) => {
+                    // Filter string is not an work item ID but a date!
+                    let (from_timestamp, to_timestamp) = filter_keyword_to_time_range(filter);
 
-            persistence::filter_entries(from_timestamp, to_timestamp).unwrap()
+                    persistence::find_items_by_timerange(from_timestamp, to_timestamp).unwrap()
+                }
+            }
         }
     };
 
@@ -85,7 +94,14 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
         let tags_formatted: Vec<_> = entry.tags().iter().map(|s| format!("#{}", s)).collect();
 
         println!(
-            "• [{}] {} - {} ({})",
+            "• {} [{}] {} - {} ({})",
+            format!(
+                "#{}",
+                entry
+                    .id()
+                    .expect("Work item must have an ID at this point!")
+            )
+            .color(colorful::Color::DodgerBlue3),
             date_time
                 .format("%H:%M")
                 .to_string()

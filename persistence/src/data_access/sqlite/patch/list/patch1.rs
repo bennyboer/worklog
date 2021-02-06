@@ -7,7 +7,7 @@ pub struct Patch1;
 
 impl Patch for Patch1 {
     fn version(&self) -> i32 {
-        2
+        1
     }
 
     fn patch(&self, con: &mut Connection) -> Result<(), Box<dyn Error>> {

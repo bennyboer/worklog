@@ -17,12 +17,14 @@ impl Patcher<'_> {
     /// Patch the database.
     pub fn patch(&mut self, from_version: i32, to_version: i32) -> Result<(), Box<dyn Error>> {
         for patch in &PATCHES {
-            if to_version <= from_version || from_version >= patch.version() {
-                break; // No more patches needed
-            }
+            let patch_needed = from_version < to_version
+                && patch.version() > from_version
+                && patch.version() <= to_version;
 
-            patch.patch(self.connection)?;
-            self.change_version(patch.version())?;
+            if patch_needed {
+                patch.patch(self.connection)?;
+                self.change_version(patch.version())?;
+            }
         }
 
         Ok(())

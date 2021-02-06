@@ -1,31 +1,37 @@
-use entry::LogEntry;
 use std::error::Error;
+use work_item::WorkItem;
 
 mod data_access;
-pub mod entry;
+pub mod work_item;
 
-/// Log a work entry.
-pub fn log_entry(entry: LogEntry) -> Result<(), Box<dyn Error>> {
+/// Log a work work_item.
+pub fn log_entry(entry: WorkItem) -> Result<(), Box<dyn Error>> {
     let mut data_access = data_access::get_data_access()?;
 
-    data_access.log_entry(entry)?;
+    data_access.log_item(entry)?;
 
     Ok(())
 }
 
-pub fn list_entries() -> Result<Vec<LogEntry>, Box<dyn Error>> {
+pub fn list_items() -> Result<Vec<WorkItem>, Box<dyn Error>> {
     let data_access = data_access::get_data_access()?;
 
-    Ok(data_access.list_entries()?)
+    Ok(data_access.list_items()?)
 }
 
-pub fn filter_entries(
+pub fn find_items_by_timerange(
     from_timestamp: i64,
     to_timestamp: i64,
-) -> Result<Vec<LogEntry>, Box<dyn Error>> {
+) -> Result<Vec<WorkItem>, Box<dyn Error>> {
     let data_access = data_access::get_data_access()?;
 
-    Ok(data_access.filter_entries(from_timestamp, to_timestamp)?)
+    Ok(data_access.filter_items(from_timestamp, to_timestamp)?)
+}
+
+pub fn find_item_by_id(id: i32) -> Result<Option<WorkItem>, Box<dyn Error>> {
+    let data_access = data_access::get_data_access()?;
+
+    Ok(data_access.find_item_by_id(id)?)
 }
 
 #[cfg(test)]
