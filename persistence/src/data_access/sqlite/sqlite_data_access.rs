@@ -104,12 +104,13 @@ impl DataAccess for SQLiteDataAccess {
 
         // Insert log work_item information
         transaction.execute(
-            "INSERT INTO logs (description, time_taken, timestamp, status) VALUES (?1, ?2, ?3, ?4)",
+            "INSERT INTO logs (description, time_taken, timestamp, status, timer_timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
                 entry.description(),
                 entry.time_taken(),
                 entry.timestamp(),
-                format!("{}", entry.status())
+                format!("{}", entry.status()),
+                entry.timer_timestamp().unwrap_or(-1)
             ],
         )?;
 
@@ -132,7 +133,7 @@ impl DataAccess for SQLiteDataAccess {
 
     fn list_items(&self) -> Result<Vec<WorkItem>, Box<dyn Error>> {
         let mut statement = self.connection.prepare(
-            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, log_tags.tag \
+            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, logs.timer_timestamp, log_tags.tag \
             FROM logs, log_tags \
             WHERE logs.id = log_tags.log_id",
         )?;
@@ -146,7 +147,7 @@ impl DataAccess for SQLiteDataAccess {
         to_timestamp: i64,
     ) -> Result<Vec<WorkItem>, Box<dyn Error>> {
         let mut statement = self.connection.prepare(
-            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, log_tags.tag \
+            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, logs.timer_timestamp, log_tags.tag \
             FROM logs, log_tags \
             WHERE logs.id = log_tags.log_id AND logs.timestamp >= ?1 AND logs.timestamp < ?2",
         )?;
@@ -156,7 +157,7 @@ impl DataAccess for SQLiteDataAccess {
 
     fn find_item_by_id(&self, id: i32) -> Result<Option<WorkItem>, Box<dyn Error>> {
         let mut statement = self.connection.prepare(
-            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, log_tags.tag \
+            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, logs.timer_timestamp, log_tags.tag \
             FROM logs, log_tags \
             WHERE logs.id = log_tags.log_id AND logs.id = ?1",
         )?;
@@ -173,7 +174,7 @@ fn rows_to_items(mut rows: Rows) -> Result<Vec<WorkItem>, Box<dyn Error>> {
 
     while let Some(row) = rows.next()? {
         let id: i32 = row.get(0)?;
-        let tag = row.get(5)?;
+        let tag = row.get(6)?;
 
         if entry_map.contains_key(&id) {
             let entry = entry_map.get_mut(&id).unwrap();
@@ -183,6 +184,7 @@ fn rows_to_items(mut rows: Rows) -> Result<Vec<WorkItem>, Box<dyn Error>> {
             let time_taken = row.get(2)?;
             let timestamp = row.get(3)?;
             let status: String = row.get(4)?;
+            let timer_timestamp: i64 = row.get(5)?;
 
             let mut tag_set = HashSet::new();
             tag_set.insert(tag);
@@ -195,6 +197,11 @@ fn rows_to_items(mut rows: Rows) -> Result<Vec<WorkItem>, Box<dyn Error>> {
                 Status::from_str(&status)
                     .expect("Status string in database table logs could not be interpreted"),
                 timestamp,
+                if timer_timestamp < 0 {
+                    None
+                } else {
+                    Some(timer_timestamp)
+                },
             );
 
             entry_map.insert(id, entry);

@@ -16,6 +16,9 @@ pub struct WorkItem {
     status: Status,
     /// Timestamp of when the work item was entered into the system.
     timestamp: i64,
+    /// Timestamp of the work items timer (if any).
+    /// Used to measure the duration it took to complete a work item.
+    timer_timestamp: Option<i64>,
 }
 
 impl WorkItem {
@@ -33,6 +36,7 @@ impl WorkItem {
             time_taken,
             status,
             timestamp: Utc::now().timestamp_millis(),
+            timer_timestamp: None,
         }
     }
 
@@ -44,6 +48,7 @@ impl WorkItem {
         time_taken: i32,
         status: Status,
         timestamp: i64,
+        timer_timestamp: Option<i64>,
     ) -> WorkItem {
         WorkItem {
             id: Some(id),
@@ -52,6 +57,7 @@ impl WorkItem {
             time_taken,
             status,
             timestamp,
+            timer_timestamp,
         }
     }
 
@@ -80,6 +86,10 @@ impl WorkItem {
 
     pub fn status(&self) -> &Status {
         return &self.status;
+    }
+
+    pub fn timer_timestamp(&self) -> Option<i64> {
+        return self.timer_timestamp;
     }
 
     pub fn push_tag(&mut self, tag: String) {
