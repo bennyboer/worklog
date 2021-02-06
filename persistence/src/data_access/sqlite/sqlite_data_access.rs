@@ -99,7 +99,7 @@ impl SQLiteDataAccess {
 }
 
 impl DataAccess for SQLiteDataAccess {
-    fn log_item(&mut self, entry: WorkItem) -> Result<(), Box<dyn Error>> {
+    fn log_item(&mut self, entry: WorkItem) -> Result<i32, Box<dyn Error>> {
         let transaction = self.connection.transaction()?;
 
         // Insert log work_item information
@@ -127,12 +127,12 @@ impl DataAccess for SQLiteDataAccess {
 
         transaction.commit()?;
 
-        Ok(())
+        Ok(id)
     }
 
     fn list_items(&self) -> Result<Vec<WorkItem>, Box<dyn Error>> {
         let mut statement = self.connection.prepare(
-            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, log_tags.tag \
+            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, log_tags.tag \
             FROM logs, log_tags \
             WHERE logs.id = log_tags.log_id",
         )?;

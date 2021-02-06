@@ -4,7 +4,8 @@ use std::error::Error;
 /// Common data access interface.
 pub trait DataAccess {
     /// Log a work work_item.
-    fn log_item(&mut self, entry: WorkItem) -> Result<(), Box<dyn Error>>;
+    /// Will return the ID of the new work item.
+    fn log_item(&mut self, entry: WorkItem) -> Result<i32, Box<dyn Error>>;
 
     /// List all available work items.
     fn list_items(&self) -> Result<Vec<WorkItem>, Box<dyn Error>>;

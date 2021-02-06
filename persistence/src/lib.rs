@@ -5,12 +5,11 @@ mod data_access;
 pub mod work_item;
 
 /// Log a work work_item.
-pub fn log_entry(entry: WorkItem) -> Result<(), Box<dyn Error>> {
+/// Will return the ID of the new item.
+pub fn log_item(entry: WorkItem) -> Result<i32, Box<dyn Error>> {
     let mut data_access = data_access::get_data_access()?;
 
-    data_access.log_item(entry)?;
-
-    Ok(())
+    Ok(data_access.log_item(entry)?)
 }
 
 pub fn list_items() -> Result<Vec<WorkItem>, Box<dyn Error>> {

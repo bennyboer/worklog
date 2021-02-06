@@ -1,6 +1,7 @@
 use crate::command::command::Command;
 use crate::util;
 use cmd_args::{arg, option, Group};
+use colorful::Colorful;
 use persistence::work_item::Status;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
@@ -50,5 +51,10 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
         Status::Done,
     );
 
-    persistence::log_entry(entry).unwrap();
+    let new_id = persistence::log_item(entry).unwrap();
+
+    println!(
+        "Create work item with ID {}",
+        format!("#{}", new_id).color(colorful::Color::DodgerBlue3)
+    );
 }
