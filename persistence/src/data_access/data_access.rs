@@ -1,11 +1,15 @@
-use crate::work_item::WorkItem;
 use std::error::Error;
+
+use crate::work_item::{Status, WorkItem};
 
 /// Common data access interface.
 pub trait DataAccess {
     /// Log a work work_item.
     /// Will return the ID of the new work item.
-    fn log_item(&mut self, entry: WorkItem) -> Result<i32, Box<dyn Error>>;
+    fn log_item(&mut self, item: WorkItem) -> Result<i32, Box<dyn Error>>;
+
+    /// Update a bunch of work items.
+    fn update_items(&mut self, items: Vec<&WorkItem>) -> Result<(), Box<dyn Error>>;
 
     /// List all available work items.
     fn list_items(&self) -> Result<Vec<WorkItem>, Box<dyn Error>>;
@@ -19,4 +23,7 @@ pub trait DataAccess {
 
     /// Find a work item by its ID.
     fn find_item_by_id(&self, id: i32) -> Result<Option<WorkItem>, Box<dyn Error>>;
+
+    /// Find work items by the given status.
+    fn find_items_by_status(&self, status: Status) -> Result<Vec<WorkItem>, Box<dyn Error>>;
 }

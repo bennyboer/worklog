@@ -1,6 +1,6 @@
-use crate::work_item::Status;
-use chrono::Utc;
 use std::collections::HashSet;
+
+use crate::work_item::Status;
 
 #[derive(Debug)]
 pub struct WorkItem {
@@ -10,8 +10,8 @@ pub struct WorkItem {
     description: String,
     /// Tags to further classify the work item.
     tags: HashSet<String>,
-    /// Time spent on the work item (in seconds).
-    time_taken: i32,
+    /// Time spent on the work item (in milliseconds).
+    time_taken: i64,
     /// Status of the work item.
     status: Status,
     /// Timestamp of when the work item was entered into the system.
@@ -26,7 +26,7 @@ impl WorkItem {
     pub fn new(
         description: String,
         tags: HashSet<String>,
-        time_taken: i32,
+        time_taken: i64,
         status: Status,
     ) -> WorkItem {
         WorkItem {
@@ -35,7 +35,7 @@ impl WorkItem {
             tags,
             time_taken,
             status,
-            timestamp: Utc::now().timestamp_millis(),
+            timestamp: chrono::Utc::now().timestamp_millis(),
             timer_timestamp: None,
         }
     }
@@ -45,7 +45,7 @@ impl WorkItem {
         id: i32,
         description: String,
         tags: HashSet<String>,
-        time_taken: i32,
+        time_taken: i64,
         status: Status,
         timestamp: i64,
         timer_timestamp: Option<i64>,
@@ -76,8 +76,12 @@ impl WorkItem {
         return arr;
     }
 
-    pub fn time_taken(&self) -> i32 {
+    pub fn time_taken(&self) -> i64 {
         return self.time_taken;
+    }
+
+    pub fn set_time_taken(&mut self, time_in_ms: i64) {
+        self.time_taken = time_in_ms;
     }
 
     pub fn timestamp(&self) -> i64 {
@@ -88,8 +92,16 @@ impl WorkItem {
         return &self.status;
     }
 
+    pub fn set_status(&mut self, status: Status) {
+        self.status = status;
+    }
+
     pub fn timer_timestamp(&self) -> Option<i64> {
         return self.timer_timestamp;
+    }
+
+    pub fn set_timer_timestamp(&mut self, timestamp: Option<i64>) {
+        self.timer_timestamp = timestamp;
     }
 
     pub fn push_tag(&mut self, tag: String) {

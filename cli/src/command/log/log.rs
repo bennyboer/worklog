@@ -47,14 +47,14 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
     let entry = persistence::work_item::WorkItem::new(
         description.to_owned(),
         HashSet::from_iter(tags.into_iter()),
-        time_taken,
+        time_taken as i64,
         Status::Done,
     );
 
     let new_id = persistence::log_item(entry).unwrap();
 
     println!(
-        "Create work item with ID {}",
+        "Create work item with ID {}.",
         format!("#{}", new_id).color(colorful::Color::DodgerBlue3)
     );
 }

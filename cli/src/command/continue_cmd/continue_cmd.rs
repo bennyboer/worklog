@@ -1,6 +1,10 @@
-use crate::command::command::Command;
-use cmd_args::{arg, option, Group};
 use std::collections::HashMap;
+
+use cmd_args::{arg, option, Group};
+
+use persistence::work_item::{Status, WorkItem};
+
+use crate::command::command::Command;
 
 /// Command used to continue working on an in progress work item.
 pub struct ContinueCommand {}
@@ -18,7 +22,7 @@ impl Command for ContinueCommand {
     }
 
     fn aliases(&self) -> Option<Vec<&str>> {
-        None
+        Some(vec!["c"])
     }
 
     fn name(&self) -> &str {
@@ -27,6 +31,42 @@ impl Command for ContinueCommand {
 }
 
 /// Execute the continue command.
-fn execute(_args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
-    // TODO
+fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
+    let id = args[0]
+        .int()
+        .expect("Expected an ID of a work item as first argument");
+
+    match persistence::find_item_by_id(id) {
+        Ok(option) => match option {
+            Some(mut item) => {
+                if let Status::Paused = item.status() {
+                    continue_work_item(&mut item);
+
+                    match persistence::update_items(vec![&item]) {
+                        Ok(_) => println!("Continued work item with ID {}.", id),
+                        Err(e) => println!(
+                            "Failed to continue work item with ID {}. Error: '{}'",
+                            id, e
+                        ),
+                    };
+                } else {
+                    println!("Work item with ID {} is currently not paused and thus cannot be continued working on.", id);
+                }
+            }
+            None => println!("Could not find work item with ID {}.", id),
+        },
+        Err(e) => println!(
+            "An error occurred while trying to lookup the work item with ID {}. Error: '{}'",
+            id, e
+        ),
+    };
+}
+
+fn continue_work_item(item: &mut WorkItem) {
+    item.set_status(Status::InProgress);
+
+    let continue_timestamp = chrono::Utc::now().timestamp_millis();
+
+    // Update timer_timestamp to be the current continue_timestamp
+    item.set_timer_timestamp(Some(continue_timestamp));
 }

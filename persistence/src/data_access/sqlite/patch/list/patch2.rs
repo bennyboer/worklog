@@ -22,7 +22,7 @@ impl Patch for Patch2 {
 
         // Add timer timestamp column.
         // This column will hold a timestamp of when the "timer" has been started
-        // or paused to get the work item duration from when calling stop.
+        // or paused to get the work item duration from when calling finish.
         transaction.execute(
             "ALTER TABLE logs ADD COLUMN timer_timestamp INTEGER NOT NULL DEFAULT -1",
             NO_PARAMS,

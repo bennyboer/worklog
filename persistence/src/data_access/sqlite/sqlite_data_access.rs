@@ -1,4 +1,6 @@
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
+use std::str::FromStr;
 use std::{fs, path};
 
 use rusqlite::{params, Connection, Rows, NO_PARAMS};
@@ -6,8 +8,6 @@ use rusqlite::{params, Connection, Rows, NO_PARAMS};
 use crate::data_access::sqlite::patch::Patcher;
 use crate::data_access::DataAccess;
 use crate::work_item::{Status, WorkItem};
-use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
 
 /// Latest database version to patch to.
 const LATEST_VERSION: i32 = 2;
@@ -99,18 +99,18 @@ impl SQLiteDataAccess {
 }
 
 impl DataAccess for SQLiteDataAccess {
-    fn log_item(&mut self, entry: WorkItem) -> Result<i32, Box<dyn Error>> {
+    fn log_item(&mut self, item: WorkItem) -> Result<i32, Box<dyn Error>> {
         let transaction = self.connection.transaction()?;
 
         // Insert log work_item information
         transaction.execute(
             "INSERT INTO logs (description, time_taken, timestamp, status, timer_timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
             params![
-                entry.description(),
-                entry.time_taken(),
-                entry.timestamp(),
-                format!("{}", entry.status()),
-                entry.timer_timestamp().unwrap_or(-1)
+                item.description(),
+                item.time_taken(),
+                item.timestamp(),
+                format!("{}", item.status()),
+                item.timer_timestamp().unwrap_or(-1)
             ],
         )?;
 
@@ -119,7 +119,7 @@ impl DataAccess for SQLiteDataAccess {
             transaction.query_row("SELECT last_insert_rowid()", NO_PARAMS, |row| row.get(0))?;
 
         // Insert tags in the log_tags table
-        for tag in entry.tags() {
+        for tag in item.tags() {
             transaction.execute(
                 "INSERT INTO log_tags (log_id, tag) VALUES (?1, ?2)",
                 params![id, tag],
@@ -129,6 +129,32 @@ impl DataAccess for SQLiteDataAccess {
         transaction.commit()?;
 
         Ok(id)
+    }
+
+    fn update_items(&mut self, items: Vec<&WorkItem>) -> Result<(), Box<dyn Error>> {
+        let transaction = self.connection.transaction()?;
+
+        for item in items {
+            transaction.execute(
+                "UPDATE logs \
+        SET description = ?2, \
+        time_taken = ?3, \
+        status = ?4, \
+        timer_timestamp = ?5 \
+        WHERE id = ?1",
+                params![
+                    item.id().expect("ID must be present at this point!"),
+                    item.description(),
+                    item.time_taken(),
+                    format!("{}", item.status()),
+                    item.timer_timestamp().unwrap_or(-1)
+                ],
+            )?;
+        }
+
+        transaction.commit()?;
+
+        Ok(())
     }
 
     fn list_items(&self) -> Result<Vec<WorkItem>, Box<dyn Error>> {
@@ -165,6 +191,16 @@ impl DataAccess for SQLiteDataAccess {
         let mut items = rows_to_items(statement.query(params![id])?)?;
 
         Ok(items.pop())
+    }
+
+    fn find_items_by_status(&self, status: Status) -> Result<Vec<WorkItem>, Box<dyn Error>> {
+        let mut statement = self.connection.prepare(
+            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, logs.timer_timestamp, log_tags.tag \
+            FROM logs, log_tags \
+            WHERE logs.id = log_tags.log_id AND logs.status = ?1",
+        )?;
+
+        return rows_to_items(statement.query(params![format!("{}", status)])?);
     }
 }
 

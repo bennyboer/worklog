@@ -1,9 +1,13 @@
-use crate::command::command::Command;
-use crate::util;
-use cmd_args::{arg, option, Group};
-use colorful::Colorful;
 use std::collections::HashMap;
 use std::ops::Sub;
+
+use cmd_args::{arg, option, Group};
+use colorful::Colorful;
+
+use persistence::work_item::{Status, WorkItem};
+
+use crate::command::command::Command;
+use crate::util;
 
 /// Command used to list work items.
 pub struct ListCommand {}
@@ -71,9 +75,9 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
     entries.sort_by_key(|v| i64::max_value() - v.timestamp());
 
     let mut last_date_option: Option<chrono::Date<chrono::Utc>> = None;
-    for entry in &entries {
+    for item in &entries {
         let date_time: chrono::DateTime<chrono::Utc> = chrono::DateTime::from_utc(
-            chrono::NaiveDateTime::from_timestamp(entry.timestamp() / 1000, 0),
+            chrono::NaiveDateTime::from_timestamp(item.timestamp() / 1000, 0),
             chrono::Utc,
         );
 
@@ -91,32 +95,54 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
             println!();
         }
 
-        let tags_formatted: Vec<_> = entry.tags().iter().map(|s| format!("#{}", s)).collect();
-
-        println!(
-            "• {} [{}] {} - {} ({})",
-            format!(
-                "#{}",
-                entry
-                    .id()
-                    .expect("Work item must have an ID at this point!")
-            )
-            .color(colorful::Color::DodgerBlue3),
-            date_time
-                .format("%H:%M")
-                .to_string()
-                .color(colorful::Color::DeepPink1a),
-            entry.description(),
-            util::format_duration(entry.time_taken() as u32).color(colorful::Color::Orange1),
-            tags_formatted
-                .join(", ")
-                .color(colorful::Color::DarkSlateGray1)
-        );
+        println!("{}", format_item(item, &date_time));
 
         last_date_option = Some(date_time.date());
     }
 
     println!();
+}
+
+/// Format a work item.
+fn format_item(item: &WorkItem, date_time: &chrono::DateTime<chrono::Utc>) -> String {
+    let id_str = format!(
+        "#{}",
+        item.id().expect("Work item must have an ID at this point!")
+    )
+    .color(colorful::Color::DodgerBlue3);
+
+    let time_str = date_time
+        .format("%H:%M")
+        .to_string()
+        .color(colorful::Color::DeepPink1a);
+
+    let description = item.description();
+
+    let duration_str =
+        util::format_duration((item.time_taken() / 1000) as u32).color(colorful::Color::Orange1);
+    let status_str = match item.status() {
+        Status::Done => duration_str,
+        Status::InProgress => {
+            // Calculate current time of the work item
+            let time_taken = item.time_taken()
+                + (chrono::Utc::now().timestamp_millis() - item.timer_timestamp().unwrap());
+            let duration_str =
+                util::format_duration((time_taken / 1000) as u32).color(colorful::Color::Orange1);
+
+            format!("IN PROGRESS ({})", duration_str).color(colorful::Color::GreenYellow)
+        }
+        Status::Paused => format!("PAUSED ({})", duration_str).color(colorful::Color::Red),
+    };
+
+    let tags_formatted: Vec<_> = item.tags().iter().map(|s| format!("#{}", s)).collect();
+    let tags_str = tags_formatted
+        .join(", ")
+        .color(colorful::Color::DarkSlateGray1);
+
+    format!(
+        "• {} [{}] {} - {} ({})",
+        id_str, time_str, description, status_str, tags_str
+    )
 }
 
 /// Convert the passed filter keyword ("today", "yesterday", "2020-02-02")

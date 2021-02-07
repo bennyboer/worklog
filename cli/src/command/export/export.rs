@@ -54,7 +54,7 @@ fn export_to_markdown(file_path: &str) {
             "- {} ({}), took {} minutes\n",
             entry.description(),
             entry.tags().join(", "),
-            entry.time_taken() / 60
+            entry.time_taken() / 1000 / 60
         ));
     }
 
