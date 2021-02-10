@@ -74,12 +74,15 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
     // Sort entries by their timestamp (newest come first).
     entries.sort_by_key(|v| i64::max_value() - v.timestamp());
 
-    let mut last_date_option: Option<chrono::Date<chrono::Utc>> = None;
+    let mut last_date_option: Option<chrono::Date<_>> = None;
     for item in &entries {
         let date_time: chrono::DateTime<chrono::Utc> = chrono::DateTime::from_utc(
             chrono::NaiveDateTime::from_timestamp(item.timestamp() / 1000, 0),
             chrono::Utc,
         );
+
+        // Adjust UTC date time to the local timezone
+        let date_time: chrono::DateTime<chrono::Local> = chrono::DateTime::from(date_time);
 
         let display_date = match last_date_option {
             Some(last_date) => date_time.date().sub(last_date).num_days().abs() >= 1,
@@ -104,7 +107,7 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
 }
 
 /// Format a work item.
-fn format_item(item: &WorkItem, date_time: &chrono::DateTime<chrono::Utc>) -> String {
+fn format_item(item: &WorkItem, date_time: &chrono::DateTime<chrono::Local>) -> String {
     let id_str = format!(
         "#{}",
         item.id().expect("Work item must have an ID at this point!")
