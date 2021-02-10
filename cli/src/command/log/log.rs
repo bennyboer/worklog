@@ -47,7 +47,7 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
     let entry = persistence::work_item::WorkItem::new(
         description.to_owned(),
         HashSet::from_iter(tags.into_iter()),
-        time_taken as i64,
+        (time_taken as i64) * 1000,
         Status::Done,
     );
 
