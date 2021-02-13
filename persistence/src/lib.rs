@@ -49,6 +49,12 @@ pub fn find_items_by_status(status: Status) -> Result<Vec<WorkItem>, Box<dyn Err
     Ok(data_access.find_items_by_status(status)?)
 }
 
+pub fn delete_item(id: i32) -> Result<Option<WorkItem>, Box<dyn Error>> {
+    let mut data_access = data_access::get_data_access()?;
+
+    Ok(data_access.delete_item(id)?)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

@@ -202,6 +202,31 @@ impl DataAccess for SQLiteDataAccess {
 
         return rows_to_items(statement.query(params![format!("{}", status)])?);
     }
+
+    fn delete_item(&mut self, id: i32) -> Result<Option<WorkItem>, Box<dyn Error>> {
+        let transaction = self.connection.transaction()?;
+
+        // First and foremost find work item
+        let item = {
+            let mut statement = transaction.prepare("SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, logs.timer_timestamp, log_tags.tag \
+        FROM logs, log_tags \
+        WHERE logs.id = log_tags.log_id AND logs.id = ?1")?;
+
+            let mut items = rows_to_items(statement.query(params![id])?)?;
+
+            items.pop()
+        };
+
+        // Delete from log_tags table first
+        transaction.execute("DELETE FROM log_tags WHERE log_id = ?1", params![id])?;
+
+        // Delete from logs table second
+        transaction.execute("DELETE FROM logs WHERE id = ?1", params![id])?;
+
+        transaction.commit()?;
+
+        Ok(item)
+    }
 }
 
 /// Fetch all log entries from the passed rows.

@@ -26,4 +26,8 @@ pub trait DataAccess {
 
     /// Find work items by the given status.
     fn find_items_by_status(&self, status: Status) -> Result<Vec<WorkItem>, Box<dyn Error>>;
+
+    /// Delete a work item with the given ID.
+    /// Returns the deleted work item or None if there is no item with the given ID.
+    fn delete_item(&mut self, id: i32) -> Result<Option<WorkItem>, Box<dyn Error>>;
 }

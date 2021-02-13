@@ -5,6 +5,7 @@ mod list;
 mod log;
 mod pause;
 mod start;
+mod delete;
 
 mod command;
 mod commands;
