@@ -69,11 +69,19 @@ impl WorkItem {
         &self.description
     }
 
+    pub fn set_description(&mut self, description: String) {
+        self.description = description;
+    }
+
     pub fn tags(&self) -> Vec<String> {
         let mut arr: Vec<String> = self.tags.iter().map(|s| s.to_owned()).collect();
         arr.sort();
 
         return arr;
+    }
+
+    pub fn set_tags(&mut self, tags: HashSet<String>) {
+        self.tags = tags;
     }
 
     pub fn time_taken(&self) -> i64 {

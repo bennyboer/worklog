@@ -135,6 +135,7 @@ impl DataAccess for SQLiteDataAccess {
         let transaction = self.connection.transaction()?;
 
         for item in items {
+            // Update in logs table
             transaction.execute(
                 "UPDATE logs \
         SET description = ?2, \
@@ -150,6 +151,17 @@ impl DataAccess for SQLiteDataAccess {
                     item.timer_timestamp().unwrap_or(-1)
                 ],
             )?;
+
+            // Delete all tags for the work item in the log_tags table
+            transaction.execute("DELETE FROM log_tags WHERE log_id = ?1", params![item.id()])?;
+
+            // Enter new tags in the log_tags table
+            for tag in item.tags() {
+                transaction.execute(
+                    "INSERT INTO log_tags (log_id, tag) VALUES (?1, ?2)",
+                    params![item.id(), tag],
+                )?;
+            }
         }
 
         transaction.commit()?;
