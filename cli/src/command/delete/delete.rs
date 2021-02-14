@@ -4,7 +4,7 @@ use cmd_args::{arg, option, Group};
 
 use crate::command::command::Command;
 
-/// Command used to finish an in progress work item.
+/// Command used to delete a work item.
 pub struct DeleteCommand {}
 
 impl Command for DeleteCommand {

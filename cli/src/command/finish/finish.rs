@@ -71,3 +71,16 @@ fn finish_work_item(item: &mut WorkItem) {
     // Set timer timestamp to None
     item.set_timer_timestamp(None);
 }
+
+pub(crate) fn finish_all_paused_work_items() {
+    let mut result = persistence::find_items_by_status(Status::Paused).unwrap();
+
+    let mut to_update = Vec::new();
+    for item in result.iter_mut() {
+        finish_work_item(item);
+
+        to_update.push(&*item);
+    }
+
+    persistence::update_items(to_update).unwrap();
+}

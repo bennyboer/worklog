@@ -30,4 +30,7 @@ pub trait DataAccess {
     /// Delete a work item with the given ID.
     /// Returns the deleted work item or None if there is no item with the given ID.
     fn delete_item(&mut self, id: i32) -> Result<Option<WorkItem>, Box<dyn Error>>;
+
+    /// Clear the underlying database (Remove all work items).
+    fn clear(&mut self) -> Result<(), Box<dyn Error>>;
 }

@@ -239,6 +239,20 @@ impl DataAccess for SQLiteDataAccess {
 
         Ok(item)
     }
+
+    fn clear(&mut self) -> Result<(), Box<dyn Error>> {
+        let transaction = self.connection.transaction()?;
+
+        // Clear the log_tags table
+        transaction.execute("DELETE FROM log_tags", NO_PARAMS)?;
+
+        // Clear the logs table
+        transaction.execute("DELETE FROM logs", NO_PARAMS)?;
+
+        transaction.commit()?;
+
+        Ok(())
+    }
 }
 
 /// Fetch all log entries from the passed rows.

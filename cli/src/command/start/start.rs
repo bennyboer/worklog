@@ -7,7 +7,7 @@ use colorful::Colorful;
 use persistence::work_item::Status;
 
 use crate::command::command::Command;
-use crate::command::pause;
+use crate::command::{finish, pause};
 
 /// Command used to start a work item.
 pub struct StartCommand {}
@@ -28,6 +28,11 @@ impl Command for StartCommand {
             option::Type::Bool { default: false },
             "Pause all work items currently in progress",
         ))
+        .add_option(option::Descriptor::new(
+            "finish",
+            option::Type::Bool { default: false },
+            "Finish all work items currently in progress",
+        ))
     }
 
     fn aliases(&self) -> Option<Vec<&str>> {
@@ -47,10 +52,18 @@ fn execute(args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
     let tags: Vec<String> = tags_str.split(",").map(|s| s.trim().to_owned()).collect();
 
     let pause_work_items_in_progress = options.get("pause").unwrap().bool().unwrap();
+    let finish_work_items_in_progress = options.get("finish").unwrap().bool().unwrap();
+
+    // If both --pause and --finish are specified we are finishing all items!
 
     // Stopping in progress work items first
-    if pause_work_items_in_progress {
+    if finish_work_items_in_progress || pause_work_items_in_progress {
         pause::pause_all_work_items_in_progress();
+    }
+
+    // When --finish specified -> Finish all paused work items
+    if finish_work_items_in_progress {
+        finish::finish_all_paused_work_items();
     }
 
     let mut item = persistence::work_item::WorkItem::new(

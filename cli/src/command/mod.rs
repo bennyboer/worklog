@@ -1,3 +1,4 @@
+mod clear;
 mod continue_cmd;
 mod delete;
 mod edit;
