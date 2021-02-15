@@ -2,7 +2,7 @@ use std::fmt;
 use std::str;
 
 /// Status of a log work_item.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Status {
     Done,
     InProgress,

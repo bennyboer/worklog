@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cmd_args::{arg, option, Group};
 
-use persistence::work_item::{Status, WorkItem};
+use persistence::work_item::Status;
 
 use crate::command::command::Command;
 
@@ -40,7 +40,7 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
         Ok(option) => match option {
             Some(mut item) => {
                 if let Status::Paused = item.status() {
-                    continue_work_item(&mut item);
+                    item.continue_working().unwrap();
 
                     match persistence::update_items(vec![&item]) {
                         Ok(_) => println!("Continued work item with ID {}.", id),
@@ -60,13 +60,4 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
             id, e
         ),
     };
-}
-
-fn continue_work_item(item: &mut WorkItem) {
-    item.set_status(Status::InProgress);
-
-    let continue_timestamp = chrono::Utc::now().timestamp_millis();
-
-    // Update timer_timestamp to be the current continue_timestamp
-    item.set_timer_timestamp(Some(continue_timestamp));
 }

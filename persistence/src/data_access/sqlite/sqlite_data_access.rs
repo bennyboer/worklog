@@ -3,14 +3,16 @@ use std::error::Error;
 use std::str::FromStr;
 use std::{fs, path};
 
-use rusqlite::{params, Connection, Rows, NO_PARAMS};
+use rusqlite::{params, Connection, Rows, Transaction, NO_PARAMS};
 
 use crate::data_access::sqlite::patch::Patcher;
 use crate::data_access::DataAccess;
+use crate::work_item::event::{Event, EventType};
 use crate::work_item::{Status, WorkItem};
+use std::collections::hash_map::Entry;
 
 /// Latest database version to patch to.
-const LATEST_VERSION: i32 = 2;
+const LATEST_VERSION: i32 = 1;
 
 /// Directory under the HOME directory of the current user where
 /// to store the logs database.
@@ -32,6 +34,13 @@ fn determine_database_path() -> Result<path::PathBuf, &'static str> {
     }?
     .join(SUB_HOME_DIRECTORY)
     .join(FILE_NAME))
+}
+
+/// Work item to be filled with more data.
+struct TmpWorkItem {
+    id: i32,
+    description: String,
+    status: Status,
 }
 
 impl SQLiteDataAccess {
@@ -102,16 +111,10 @@ impl DataAccess for SQLiteDataAccess {
     fn log_item(&mut self, item: WorkItem) -> Result<i32, Box<dyn Error>> {
         let transaction = self.connection.transaction()?;
 
-        // Insert log work_item information
+        // Insert work item information to logs table
         transaction.execute(
-            "INSERT INTO logs (description, time_taken, timestamp, status, timer_timestamp) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                item.description(),
-                item.time_taken(),
-                item.timestamp(),
-                format!("{}", item.status()),
-                item.timer_timestamp().unwrap_or(-1)
-            ],
+            "INSERT INTO logs (description, status) VALUES (?1, ?2)",
+            params![item.description(), format!("{}", item.status())],
         )?;
 
         // Check ID of the new log work_item
@@ -119,12 +122,10 @@ impl DataAccess for SQLiteDataAccess {
             transaction.query_row("SELECT last_insert_rowid()", NO_PARAMS, |row| row.get(0))?;
 
         // Insert tags in the log_tags table
-        for tag in item.tags() {
-            transaction.execute(
-                "INSERT INTO log_tags (log_id, tag) VALUES (?1, ?2)",
-                params![id, tag],
-            )?;
-        }
+        insert_tags(&transaction, id, &item.tags())?;
+
+        // Insert events in the log_events table
+        insert_events(&transaction, id, item.events())?;
 
         transaction.commit()?;
 
@@ -135,33 +136,28 @@ impl DataAccess for SQLiteDataAccess {
         let transaction = self.connection.transaction()?;
 
         for item in items {
+            let id = item.id().expect("ID must be present at this point!");
+
             // Update in logs table
             transaction.execute(
                 "UPDATE logs \
         SET description = ?2, \
-        time_taken = ?3, \
-        status = ?4, \
-        timer_timestamp = ?5 \
+        status = ?3 \
         WHERE id = ?1",
-                params![
-                    item.id().expect("ID must be present at this point!"),
-                    item.description(),
-                    item.time_taken(),
-                    format!("{}", item.status()),
-                    item.timer_timestamp().unwrap_or(-1)
-                ],
+                params![id, item.description(), format!("{}", item.status())],
             )?;
 
             // Delete all tags for the work item in the log_tags table
-            transaction.execute("DELETE FROM log_tags WHERE log_id = ?1", params![item.id()])?;
+            delete_tags(&transaction, id)?;
 
             // Enter new tags in the log_tags table
-            for tag in item.tags() {
-                transaction.execute(
-                    "INSERT INTO log_tags (log_id, tag) VALUES (?1, ?2)",
-                    params![item.id(), tag],
-                )?;
-            }
+            insert_tags(&transaction, id, &item.tags())?;
+
+            // Delete all events for the work item in the log_events table
+            delete_events(&transaction, id)?;
+
+            // Enter new events in the log_events table
+            insert_events(&transaction, id, item.events())?;
         }
 
         transaction.commit()?;
@@ -170,13 +166,29 @@ impl DataAccess for SQLiteDataAccess {
     }
 
     fn list_items(&self) -> Result<Vec<WorkItem>, Box<dyn Error>> {
-        let mut statement = self.connection.prepare(
-            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, logs.timer_timestamp, log_tags.tag \
-            FROM logs, log_tags \
-            WHERE logs.id = log_tags.log_id",
+        // Fetch all tmp work items from the logs table
+        let item_lookup = tmp_item_lookup_from_rows(
+            self.connection
+                .prepare("SELECT id, description, status FROM logs")?
+                .query(NO_PARAMS)?,
         )?;
 
-        return rows_to_items(statement.query(NO_PARAMS)?);
+        // Fetch and cache tags for later lookup
+        let tags_lookup: HashMap<i32, HashSet<String>> = tags_lookup_from_rows(
+            self.connection
+                .prepare("SELECT log_id, tag FROM log_tags")?
+                .query(NO_PARAMS)?,
+        )?;
+
+        // Fetch and cache events for later lookup
+        let events_lookup = events_lookup_from_rows(
+            self.connection
+                .prepare("SELECT log_id, timestamp, event FROM log_events")?
+                .query(NO_PARAMS)?,
+        )?;
+
+        // Create work items from the cached data
+        Ok(create_work_items(item_lookup, tags_lookup, events_lookup))
     }
 
     fn filter_items(
@@ -184,35 +196,115 @@ impl DataAccess for SQLiteDataAccess {
         from_timestamp: i64,
         to_timestamp: i64,
     ) -> Result<Vec<WorkItem>, Box<dyn Error>> {
-        let mut statement = self.connection.prepare(
-            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, logs.timer_timestamp, log_tags.tag \
-            FROM logs, log_tags \
-            WHERE logs.id = log_tags.log_id AND logs.timestamp >= ?1 AND logs.timestamp < ?2",
+        // Fetch all tmp work items from the logs table
+        let item_lookup = tmp_item_lookup_from_rows(
+            self.connection
+                .prepare(
+                    "SELECT logs.id, logs.description, logs.status \
+            FROM logs, log_events \
+            WHERE logs.id = log_events.log_id \
+                AND log_events.event = 'STARTED' \
+                AND log_events.timestamp >= ?1 \
+                AND log_events.timestamp < ?2",
+                )?
+                .query(params![from_timestamp, to_timestamp])?,
         )?;
 
-        return rows_to_items(statement.query(params![from_timestamp, to_timestamp])?);
+        // Fetch and cache tags for later lookup
+        let tags_lookup: HashMap<i32, HashSet<String>> = tags_lookup_from_rows(
+            self.connection
+                .prepare(
+                    "SELECT log_id, tag \
+            FROM log_tags \
+            WHERE log_id IN (\
+                SELECT logs.id \
+                FROM logs, log_events \
+                WHERE logs.id = log_events.log_id \
+                    AND log_events.event = 'STARTED' \
+                    AND log_events.timestamp >= ?1 \
+                    AND log_events.timestamp < ?2\
+            )",
+                )?
+                .query(params![from_timestamp, to_timestamp])?,
+        )?;
+
+        // Fetch and cache events for later lookup
+        let events_lookup = events_lookup_from_rows(
+            self.connection
+                .prepare(
+                    "SELECT log_id, timestamp, event \
+            FROM log_events WHERE log_id IN (\
+                SELECT logs.id \
+                FROM logs, log_events \
+                WHERE logs.id = log_events.log_id \
+                    AND log_events.event = 'STARTED' \
+                    AND log_events.timestamp >= ?1 \
+                    AND log_events.timestamp < ?2\
+            )",
+                )?
+                .query(params![from_timestamp, to_timestamp])?,
+        )?;
+
+        // Create work items from the cached data
+        Ok(create_work_items(item_lookup, tags_lookup, events_lookup))
     }
 
     fn find_item_by_id(&self, id: i32) -> Result<Option<WorkItem>, Box<dyn Error>> {
-        let mut statement = self.connection.prepare(
-            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, logs.timer_timestamp, log_tags.tag \
-            FROM logs, log_tags \
-            WHERE logs.id = log_tags.log_id AND logs.id = ?1",
+        let item_lookup = tmp_item_lookup_from_rows(
+            self.connection
+                .prepare("SELECT id, description, status FROM logs WHERE id = ?1")?
+                .query(params![id])?,
         )?;
 
-        let mut items = rows_to_items(statement.query(params![id])?)?;
+        // Fetch and cache tags for later lookup
+        let tags_lookup: HashMap<i32, HashSet<String>> = tags_lookup_from_rows(
+            self.connection
+                .prepare("SELECT log_id, tag FROM log_tags WHERE log_id = ?1")?
+                .query(params![id])?,
+        )?;
 
-        Ok(items.pop())
+        // Fetch and cache events for later lookup
+        let events_lookup = events_lookup_from_rows(
+            self.connection
+                .prepare("SELECT log_id, timestamp, event FROM log_events WHERE log_id = ?1")?
+                .query(params![id])?,
+        )?;
+
+        // Create work items from the cached data
+        Ok(create_work_items(item_lookup, tags_lookup, events_lookup).pop())
     }
 
     fn find_items_by_status(&self, status: Status) -> Result<Vec<WorkItem>, Box<dyn Error>> {
-        let mut statement = self.connection.prepare(
-            "SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, logs.timer_timestamp, log_tags.tag \
-            FROM logs, log_tags \
-            WHERE logs.id = log_tags.log_id AND logs.status = ?1",
+        let item_lookup = tmp_item_lookup_from_rows(
+            self.connection
+                .prepare("SELECT id, description, status FROM logs WHERE status = ?1")?
+                .query(params![format!("{}", status)])?,
         )?;
 
-        return rows_to_items(statement.query(params![format!("{}", status)])?);
+        // Fetch and cache tags for later lookup
+        let tags_lookup: HashMap<i32, HashSet<String>> = tags_lookup_from_rows(
+            self.connection
+                .prepare(
+                    "SELECT log_id, tag FROM log_tags WHERE log_id IN (\
+                    SELECT id FROM logs WHERE status = ?1
+                )",
+                )?
+                .query(params![format!("{}", status)])?,
+        )?;
+
+        // Fetch and cache events for later lookup
+        let events_lookup = events_lookup_from_rows(
+            self.connection
+                .prepare(
+                    "SELECT log_id, timestamp, event FROM log_events WHERE log_id IN (\
+                    SELECT id FROM logs WHERE status = ?1
+                )",
+                )?
+                .query(params![format!("{}", status)])?,
+        )?;
+
+        // Create work items from the cached data
+        Ok(create_work_items(item_lookup, tags_lookup, events_lookup))
     }
 
     fn delete_item(&mut self, id: i32) -> Result<Option<WorkItem>, Box<dyn Error>> {
@@ -220,19 +312,37 @@ impl DataAccess for SQLiteDataAccess {
 
         // First and foremost find work item
         let item = {
-            let mut statement = transaction.prepare("SELECT logs.id, logs.description, logs.time_taken, logs.timestamp, logs.status, logs.timer_timestamp, log_tags.tag \
-        FROM logs, log_tags \
-        WHERE logs.id = log_tags.log_id AND logs.id = ?1")?;
+            let item_lookup = tmp_item_lookup_from_rows(
+                transaction
+                    .prepare("SELECT id, description, status FROM logs WHERE id = ?1")?
+                    .query(params![id])?,
+            )?;
 
-            let mut items = rows_to_items(statement.query(params![id])?)?;
+            // Fetch and cache tags for later lookup
+            let tags_lookup: HashMap<i32, HashSet<String>> = tags_lookup_from_rows(
+                transaction
+                    .prepare("SELECT log_id, tag FROM log_tags WHERE log_id = ?1")?
+                    .query(params![id])?,
+            )?;
 
-            items.pop()
+            // Fetch and cache events for later lookup
+            let events_lookup = events_lookup_from_rows(
+                transaction
+                    .prepare("SELECT log_id, timestamp, event FROM log_events WHERE log_id = ?1")?
+                    .query(params![id])?,
+            )?;
+
+            // Create work items from the cached data
+            create_work_items(item_lookup, tags_lookup, events_lookup).pop()
         };
 
         // Delete from log_tags table first
         transaction.execute("DELETE FROM log_tags WHERE log_id = ?1", params![id])?;
 
-        // Delete from logs table second
+        // Delete from log_events table second
+        transaction.execute("DELETE FROM log_events WHERE log_id = ?1", params![id])?;
+
+        // Delete from logs table third
         transaction.execute("DELETE FROM logs WHERE id = ?1", params![id])?;
 
         transaction.commit()?;
@@ -246,6 +356,9 @@ impl DataAccess for SQLiteDataAccess {
         // Clear the log_tags table
         transaction.execute("DELETE FROM log_tags", NO_PARAMS)?;
 
+        // Clear the log_events table
+        transaction.execute("DELETE FROM log_events", NO_PARAMS)?;
+
         // Clear the logs table
         transaction.execute("DELETE FROM logs", NO_PARAMS)?;
 
@@ -255,45 +368,145 @@ impl DataAccess for SQLiteDataAccess {
     }
 }
 
-/// Fetch all log entries from the passed rows.
-fn rows_to_items(mut rows: Rows) -> Result<Vec<WorkItem>, Box<dyn Error>> {
-    let mut entry_map = HashMap::<i32, WorkItem>::new();
+/// Create final work items from the passed caches.
+fn create_work_items(
+    item_lookup: HashMap<i32, TmpWorkItem>,
+    mut tags_lookup: HashMap<i32, HashSet<String>>,
+    mut events_lookup: HashMap<i32, Vec<Event>>,
+) -> Vec<WorkItem> {
+    item_lookup
+        .into_iter()
+        .map(|(id, tmp_item)| {
+            // Retrieve cached tags
+            let tags = tags_lookup.remove(&id).unwrap_or(HashSet::new());
 
+            // Retrieve cached events and sort them by their timestamp
+            let mut events = events_lookup
+                .remove(&id)
+                .expect("Found no events for a work item, which must not be possible");
+            events.sort_by_key(|e| e.timestamp());
+
+            WorkItem::new_internal(
+                tmp_item.id,
+                tmp_item.description,
+                tmp_item.status,
+                tags,
+                events,
+            )
+        })
+        .collect()
+}
+
+/// Create a tmp work item lookup from the given logs table rows.
+fn tmp_item_lookup_from_rows(mut rows: Rows) -> Result<HashMap<i32, TmpWorkItem>, Box<dyn Error>> {
+    let mut item_lookup = HashMap::new();
     while let Some(row) = rows.next()? {
         let id: i32 = row.get(0)?;
-        let tag = row.get(6)?;
 
-        if entry_map.contains_key(&id) {
-            let entry = entry_map.get_mut(&id).unwrap();
-            entry.push_tag(tag);
-        } else {
-            let description = row.get(1)?;
-            let time_taken = row.get(2)?;
-            let timestamp = row.get(3)?;
-            let status: String = row.get(4)?;
-            let timer_timestamp: i64 = row.get(5)?;
+        let description = row.get(1)?;
 
-            let mut tag_set = HashSet::new();
-            tag_set.insert(tag);
+        let status_str: String = row.get(2)?;
+        let status = Status::from_str(&status_str)
+            .expect("Could not interpret Status string stored in the database");
 
-            let entry = WorkItem::new_internal(
+        item_lookup.insert(
+            id,
+            TmpWorkItem {
                 id,
                 description,
-                tag_set,
-                time_taken,
-                Status::from_str(&status)
-                    .expect("Status string in database table logs could not be interpreted"),
-                timestamp,
-                if timer_timestamp < 0 {
-                    None
-                } else {
-                    Some(timer_timestamp)
-                },
-            );
-
-            entry_map.insert(id, entry);
-        }
+                status,
+            },
+        );
     }
 
-    Ok(entry_map.into_iter().map(|(_key, value)| value).collect())
+    Ok(item_lookup)
+}
+
+/// Create a tags lookup from the passed log_tags table rows.
+fn tags_lookup_from_rows(mut rows: Rows) -> Result<HashMap<i32, HashSet<String>>, Box<dyn Error>> {
+    let mut tags_lookup: HashMap<i32, HashSet<String>> = HashMap::new();
+    while let Some(row) = rows.next()? {
+        let log_id: i32 = row.get(0)?;
+        let tag: String = row.get(1)?;
+
+        match tags_lookup.entry(log_id) {
+            Entry::Occupied(mut e) => {
+                e.get_mut().insert(tag);
+            }
+            Entry::Vacant(e) => {
+                let mut set = HashSet::new();
+                set.insert(tag);
+                e.insert(set);
+            }
+        };
+    }
+
+    Ok(tags_lookup)
+}
+
+/// Create an events lookup from the passed log_events table rows.
+fn events_lookup_from_rows(mut rows: Rows) -> Result<HashMap<i32, Vec<Event>>, Box<dyn Error>> {
+    let mut events_lookup: HashMap<i32, Vec<Event>> = HashMap::new();
+    while let Some(row) = rows.next()? {
+        let log_id: i32 = row.get(0)?;
+
+        let timestamp: i64 = row.get(1)?;
+
+        let event_str: String = row.get(2)?;
+        let event_type =
+            EventType::from_str(&event_str).expect("EventType string could not be interpreted");
+
+        match events_lookup.entry(log_id) {
+            Entry::Occupied(mut e) => {
+                e.get_mut().push(Event::new(event_type, timestamp));
+            }
+            Entry::Vacant(e) => {
+                e.insert(vec![Event::new(event_type, timestamp)]);
+            }
+        };
+    }
+
+    Ok(events_lookup)
+}
+
+/// Delete all tags for the work item with the given ID.
+fn delete_tags(transaction: &Transaction, id: i32) -> Result<(), Box<dyn Error>> {
+    transaction.execute("DELETE FROM log_tags WHERE log_id = ?1", params![id])?;
+
+    Ok(())
+}
+
+/// Insert all the given tags for the work item with the passed ID.
+fn insert_tags(transaction: &Transaction, id: i32, tags: &[String]) -> Result<(), Box<dyn Error>> {
+    for tag in tags {
+        transaction.execute(
+            "INSERT INTO log_tags (log_id, tag) VALUES (?1, ?2)",
+            params![id, tag],
+        )?;
+    }
+
+    Ok(())
+}
+
+/// Delete all events for the work item with the given ID.
+fn delete_events(transaction: &Transaction, id: i32) -> Result<(), Box<dyn Error>> {
+    transaction.execute("DELETE FROM log_events WHERE log_id = ?1", params![id])?;
+
+    Ok(())
+}
+
+/// Insert all the given events for the work item with the passed ID.
+fn insert_events(
+    transaction: &Transaction,
+    id: i32,
+    events: &[Event],
+) -> Result<(), Box<dyn Error>> {
+    for event in events {
+        transaction.execute(
+            "INSERT INTO log_events (log_id, timestamp, event) VALUES (?1, ?2, ?3)",
+            params![id, event.timestamp(), format!("{}", event.event_type())],
+        )?;
+    }
+
+    Ok(())
 }

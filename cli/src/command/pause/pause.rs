@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cmd_args::{arg, option, Group};
 
-use persistence::work_item::{Status, WorkItem};
+use persistence::work_item::Status;
 
 use crate::command::command::Command;
 
@@ -53,7 +53,7 @@ fn pause_work_item_by_id(id: i32) {
     match persistence::find_item_by_id(id).unwrap() {
         Some(mut item) => {
             if let Status::InProgress = item.status() {
-                pause_work_item(&mut item);
+                item.pause_working().unwrap();
 
                 match persistence::update_items(vec![&item]) {
                     Ok(_) => println!("Paused work item with ID {}.", id),
@@ -77,27 +77,10 @@ pub(crate) fn pause_all_work_items_in_progress() {
 
     let mut to_update = Vec::new();
     for item in result.iter_mut() {
-        pause_work_item(item);
+        item.pause_working().unwrap();
 
         to_update.push(&*item);
     }
 
     persistence::update_items(to_update).unwrap();
-}
-
-pub(crate) fn pause_work_item(item: &mut WorkItem) {
-    item.set_status(Status::Paused);
-
-    let pause_timestamp = chrono::Utc::now().timestamp_millis();
-
-    // Set time_taken to the current time
-    let timer_timestamp = item
-        .timer_timestamp()
-        .expect("Timer timestamp must be present at this point!");
-    let time_taken = pause_timestamp - timer_timestamp;
-
-    item.set_time_taken(item.time_taken() + time_taken);
-
-    // Update timer_timestamp to the pause timestamp
-    item.set_timer_timestamp(Some(pause_timestamp));
 }

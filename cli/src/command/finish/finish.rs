@@ -2,10 +2,9 @@ use std::collections::HashMap;
 
 use cmd_args::{arg, option, Group};
 
-use persistence::work_item::{Status, WorkItem};
+use persistence::work_item::Status;
 
 use crate::command::command::Command;
-use crate::command::pause;
 
 /// Command used to finish an in progress work item.
 pub struct FinishCommand {}
@@ -42,12 +41,7 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
             if let Status::Done = item.status() {
                 println!("Work item with ID {} is already finished.", id);
             } else {
-                if let Status::InProgress = item.status() {
-                    // Pause work item first!
-                    pause::pause_work_item(&mut item);
-                }
-
-                finish_work_item(&mut item);
+                item.finish_working(None).unwrap();
 
                 match persistence::update_items(vec![&item]) {
                     Ok(_) => println!("Finished work item with ID {}.", id),
@@ -65,19 +59,12 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
     }
 }
 
-fn finish_work_item(item: &mut WorkItem) {
-    item.set_status(Status::Done);
-
-    // Set timer timestamp to None
-    item.set_timer_timestamp(None);
-}
-
 pub(crate) fn finish_all_paused_work_items() {
     let mut result = persistence::find_items_by_status(Status::Paused).unwrap();
 
     let mut to_update = Vec::new();
     for item in result.iter_mut() {
-        finish_work_item(item);
+        item.finish_working(None).unwrap();
 
         to_update.push(&*item);
     }

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use crate::work_item::event::{Event, EventType};
 use crate::work_item::Status;
 
 #[derive(Debug)]
@@ -10,33 +11,22 @@ pub struct WorkItem {
     description: String,
     /// Tags to further classify the work item.
     tags: HashSet<String>,
-    /// Time spent on the work item (in milliseconds).
-    time_taken: i64,
     /// Status of the work item.
     status: Status,
-    /// Timestamp of when the work item was entered into the system.
-    timestamp: i64,
-    /// Timestamp of the work items timer (if any).
-    /// Used to measure the duration it took to complete a work item.
-    timer_timestamp: Option<i64>,
+    /// Events the work item was undergoing in its lifetime.
+    /// They must be sorted by their timestamp all the time.
+    events: Vec<Event>,
 }
 
 impl WorkItem {
     /// Create a new log work_item.
-    pub fn new(
-        description: String,
-        tags: HashSet<String>,
-        time_taken: i64,
-        status: Status,
-    ) -> WorkItem {
+    pub fn new(description: String, status: Status, tags: HashSet<String>) -> WorkItem {
         WorkItem {
             id: None,
             description,
-            tags,
-            time_taken,
             status,
-            timestamp: chrono::Utc::now().timestamp_millis(),
-            timer_timestamp: None,
+            tags,
+            events: vec![Event::new(EventType::Started, get_current_timestamp())],
         }
     }
 
@@ -44,35 +34,35 @@ impl WorkItem {
     pub fn new_internal(
         id: i32,
         description: String,
-        tags: HashSet<String>,
-        time_taken: i64,
         status: Status,
-        timestamp: i64,
-        timer_timestamp: Option<i64>,
+        tags: HashSet<String>,
+        events: Vec<Event>,
     ) -> WorkItem {
         WorkItem {
             id: Some(id),
             description,
-            tags,
-            time_taken,
             status,
-            timestamp,
-            timer_timestamp,
+            tags,
+            events,
         }
     }
 
+    /// Get the work items ID.
     pub fn id(&self) -> Option<i32> {
         return self.id;
     }
 
+    /// Get the work items description.
     pub fn description(&self) -> &String {
         &self.description
     }
 
+    /// Set the work items description.
     pub fn set_description(&mut self, description: String) {
         self.description = description;
     }
 
+    /// Get a list of alphabetically sorted tags for the work item.
     pub fn tags(&self) -> Vec<String> {
         let mut arr: Vec<String> = self.tags.iter().map(|s| s.to_owned()).collect();
         arr.sort();
@@ -80,39 +70,124 @@ impl WorkItem {
         return arr;
     }
 
+    /// Set the tags describing the work item.
     pub fn set_tags(&mut self, tags: HashSet<String>) {
         self.tags = tags;
     }
 
-    pub fn time_taken(&self) -> i64 {
-        return self.time_taken;
-    }
-
-    pub fn set_time_taken(&mut self, time_in_ms: i64) {
-        self.time_taken = time_in_ms;
-    }
-
-    pub fn timestamp(&self) -> i64 {
-        return self.timestamp;
-    }
-
-    pub fn status(&self) -> &Status {
-        return &self.status;
-    }
-
-    pub fn set_status(&mut self, status: Status) {
-        self.status = status;
-    }
-
-    pub fn timer_timestamp(&self) -> Option<i64> {
-        return self.timer_timestamp;
-    }
-
-    pub fn set_timer_timestamp(&mut self, timestamp: Option<i64>) {
-        self.timer_timestamp = timestamp;
-    }
-
+    /// Push a tag describing the work item.
+    /// This will be added to the already existing tags and not override them.
     pub fn push_tag(&mut self, tag: String) {
         self.tags.insert(tag);
     }
+
+    /// Get the time the user has been working on the work item (in milliseconds).
+    pub fn time_taken(&self) -> i64 {
+        let mut time_taken: i64 = 0;
+
+        let mut cur_start_timestamp: Option<i64> = None;
+        for event in &self.events {
+            match event.event_type() {
+                EventType::Started | EventType::Continued => {
+                    cur_start_timestamp = Some(event.timestamp())
+                }
+                EventType::Paused | EventType::Finished => {
+                    // When work item has been finished after paused,
+                    // there is no cur_start_timestamp.
+                    if let Some(start) = cur_start_timestamp {
+                        let end = event.timestamp();
+
+                        time_taken += end - start;
+                        cur_start_timestamp = None;
+                    }
+                }
+            }
+        }
+
+        return time_taken;
+    }
+
+    /// Get the timestamp the item was created.
+    pub fn created_timestamp(&self) -> i64 {
+        // Get first Created event
+        for event in &self.events {
+            if let EventType::Started = event.event_type() {
+                return event.timestamp();
+            }
+        }
+
+        panic!("A work item must have a created event!");
+    }
+
+    /// Get the current status of the work item.
+    pub fn status(&self) -> Status {
+        return self.status;
+    }
+
+    /// Get all events the work item was undergoing to this moment sorted by the
+    /// events timestamp.
+    pub fn events(&self) -> &[Event] {
+        &self.events
+    }
+
+    /// Set the events of the item.
+    pub fn set_events(&mut self, events: Vec<Event>) {
+        self.events = events;
+    }
+
+    /// Pause working on the work item.
+    /// Will result in an error if the work item is in an invalid state.
+    pub fn pause_working(&mut self) -> Result<(), &'static str> {
+        if let Status::InProgress = self.status {
+            self.status = Status::Paused;
+
+            // Add paused event
+            self.events
+                .push(Event::new(EventType::Paused, get_current_timestamp()));
+
+            Ok(())
+        } else {
+            Err("Can only pause work items that are currently in progress!")
+        }
+    }
+
+    /// Continue working on the work item.
+    /// Will result in an error if the work item is in an invalid state.
+    pub fn continue_working(&mut self) -> Result<(), &'static str> {
+        if let Status::Paused = self.status {
+            self.status = Status::InProgress;
+
+            // Add continue event
+            self.events
+                .push(Event::new(EventType::Continued, get_current_timestamp()));
+
+            Ok(())
+        } else {
+            Err("Can only continue working on work items that are currently paused!")
+        }
+    }
+
+    /// Finish working on the work item.
+    /// Will result in an error if the work item is in an invalid state.
+    pub fn finish_working(&mut self, timestamp: Option<i64>) -> Result<(), &'static str> {
+        match self.status {
+            Status::InProgress | Status::Paused => {
+                self.status = Status::Done;
+
+                // Add finished event
+                self.events.push(Event::new(
+                    EventType::Finished,
+                    timestamp.unwrap_or(get_current_timestamp()),
+                ));
+
+                Ok(())
+            }
+            Status::Done => Err("Cannot finish working on work item already finished!"),
+        }
+    }
+}
+
+/// Get the current UTC+0 timestamp in milliseconds.
+fn get_current_timestamp() -> i64 {
+    chrono::Utc::now().timestamp_millis()
 }

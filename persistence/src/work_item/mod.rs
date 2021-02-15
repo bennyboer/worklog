@@ -1,3 +1,4 @@
+pub mod event;
 mod status;
 mod work_item;
 

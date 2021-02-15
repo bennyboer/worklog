@@ -1,5 +1,4 @@
 use crate::command::command::Command;
-use crate::util;
 use cmd_args::{arg, option, Group};
 use persistence::work_item::WorkItem;
 use std::collections::{HashMap, HashSet};
@@ -32,13 +31,6 @@ impl Command for EditCommand {
                 default: String::from(""),
             },
             "New tags for the work item",
-        ))
-        .add_option(option::Descriptor::new(
-            "duration",
-            option::Type::Str {
-                default: String::from(""),
-            },
-            "New duration of the work item",
         ))
     }
 
@@ -83,22 +75,9 @@ fn execute(args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
         })
         .unwrap();
 
-    let time_taken = options
-        .get("duration")
-        .unwrap()
-        .str()
-        .map(|v| {
-            if v.is_empty() {
-                None
-            } else {
-                Some(util::parse_duration(v).unwrap() as i64 * 1000)
-            }
-        })
-        .unwrap();
-
     match persistence::find_item_by_id(id) {
         Ok(item) => match item {
-            Some(mut item) => match update_work_item(&mut item, description, tags, time_taken) {
+            Some(mut item) => match update_work_item(&mut item, description, tags) {
                 Ok(_) => println!("Updated work item with ID {}.", id),
                 Err(e) => println!("Could not edit work item with ID {}. Error: '{}'.", id, e),
             },
@@ -116,7 +95,6 @@ fn update_work_item(
     item: &mut WorkItem,
     description: Option<String>,
     tags: Option<Vec<String>>,
-    time_taken: Option<i64>,
 ) -> Result<(), Box<dyn Error>> {
     if description.is_some() {
         item.set_description(description.unwrap());
@@ -124,10 +102,6 @@ fn update_work_item(
 
     if tags.is_some() {
         item.set_tags(HashSet::from_iter(tags.unwrap().into_iter()));
-    }
-
-    if time_taken.is_some() {
-        item.set_time_taken(time_taken.unwrap());
     }
 
     // Persist changes

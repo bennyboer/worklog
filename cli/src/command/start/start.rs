@@ -66,13 +66,11 @@ fn execute(args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
         finish::finish_all_paused_work_items();
     }
 
-    let mut item = persistence::work_item::WorkItem::new(
+    let item = persistence::work_item::WorkItem::new(
         description.to_owned(),
-        HashSet::from_iter(tags.into_iter()),
-        0,
         Status::InProgress,
+        HashSet::from_iter(tags.into_iter()),
     );
-    item.set_timer_timestamp(Some(item.timestamp()));
 
     let new_id = persistence::log_item(item).unwrap();
 

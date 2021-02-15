@@ -72,12 +72,12 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
     println!(" {} ", "-".repeat(found_str.len() - 2));
 
     // Sort entries by their timestamp (newest come first).
-    entries.sort_by_key(|v| i64::max_value() - v.timestamp());
+    entries.sort_by_key(|v| i64::max_value() - v.created_timestamp());
 
     let mut last_date_option: Option<chrono::Date<_>> = None;
     for item in &entries {
         let date_time: chrono::DateTime<chrono::Utc> = chrono::DateTime::from_utc(
-            chrono::NaiveDateTime::from_timestamp(item.timestamp() / 1000, 0),
+            chrono::NaiveDateTime::from_timestamp(item.created_timestamp() / 1000, 0),
             chrono::Utc,
         );
 
@@ -127,8 +127,13 @@ fn format_item(item: &WorkItem, date_time: &chrono::DateTime<chrono::Local>) -> 
         Status::Done => duration_str,
         Status::InProgress => {
             // Calculate current time of the work item
-            let time_taken = item.time_taken()
-                + (chrono::Utc::now().timestamp_millis() - item.timer_timestamp().unwrap());
+            let timer_timestamp = item
+                .events()
+                .last()
+                .expect("Must have an in-progress event at this point!")
+                .timestamp();
+            let time_taken =
+                item.time_taken() + (chrono::Utc::now().timestamp_millis() - timer_timestamp);
             let duration_str =
                 util::format_duration((time_taken / 1000) as u32).color(colorful::Color::Orange1);
 

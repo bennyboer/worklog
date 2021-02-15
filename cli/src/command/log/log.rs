@@ -2,6 +2,7 @@ use crate::command::command::Command;
 use crate::util;
 use cmd_args::{arg, option, Group};
 use colorful::Colorful;
+use persistence::work_item::event::{Event, EventType};
 use persistence::work_item::Status;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
@@ -42,16 +43,21 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
     let time_taken_str = args[2].str().unwrap();
 
     let tags: Vec<String> = tags_str.split(",").map(|s| s.trim().to_owned()).collect();
-    let time_taken = util::parse_duration(time_taken_str).unwrap();
+    let time_taken_ms = util::parse_duration(time_taken_str).unwrap() as i64 * 1000;
 
-    let entry = persistence::work_item::WorkItem::new(
+    let current_timestamp_ms = chrono::Utc::now().timestamp_millis();
+    let item = persistence::work_item::WorkItem::new_internal(
+        -1,
         description.to_owned(),
-        HashSet::from_iter(tags.into_iter()),
-        (time_taken as i64) * 1000,
         Status::Done,
+        HashSet::from_iter(tags.into_iter()),
+        vec![
+            Event::new(EventType::Started, current_timestamp_ms - time_taken_ms),
+            Event::new(EventType::Finished, current_timestamp_ms),
+        ],
     );
 
-    let new_id = persistence::log_item(entry).unwrap();
+    let new_id = persistence::log_item(item).unwrap();
 
     println!(
         "Create work item with ID {}.",
