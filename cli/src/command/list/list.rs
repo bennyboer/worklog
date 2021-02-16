@@ -102,7 +102,7 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
             print_date_header(&items);
 
             for item in items {
-                println!("{}", format_item(item));
+                println!("  • {}", format_item(item));
             }
         }
     }
@@ -128,8 +128,8 @@ fn print_date_header(items: &[&WorkItem]) {
     println!();
 }
 
-/// Calulcate the total work time of the passed items.
-fn calculate_total_work_time(items: &[&WorkItem]) -> i64 {
+/// Calculate the total work time of the passed items.
+pub(crate) fn calculate_total_work_time(items: &[&WorkItem]) -> i64 {
     let mut time_events: Vec<shared::calc::TimeEvent> = items
         .iter()
         .flat_map(|i| {
@@ -184,14 +184,14 @@ fn format_item(item: &WorkItem) -> String {
         .color(colorful::Color::DarkSlateGray1);
 
     format!(
-        "• {} [{}] {} - {} ({})",
+        "{} [{}] {} - {} ({})",
         id_str, time_str, description, status_str, tags_str
     )
 }
 
 /// Convert the passed filter keyword ("today", "yesterday", "2020-02-02")
 /// to a time range of timestamps.
-fn filter_keyword_to_time_range(keyword: &str) -> (i64, i64) {
+pub(crate) fn filter_keyword_to_time_range(keyword: &str) -> (i64, i64) {
     match keyword {
         "today" => {
             let today = chrono::Utc::today();
