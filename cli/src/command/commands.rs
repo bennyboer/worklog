@@ -8,10 +8,11 @@ use crate::command::finish::FinishCommand;
 use crate::command::list::ListCommand;
 use crate::command::log::LogCommand;
 use crate::command::pause::PauseCommand;
+use crate::command::show::ShowCommand;
 use crate::command::start::StartCommand;
 
 /// All available commands.
-pub(crate) const COMMANDS: [&dyn Command; 10] = [
+pub(crate) const COMMANDS: [&dyn Command; 11] = [
     &ListCommand {},
     &LogCommand {},
     &StartCommand {},
@@ -22,4 +23,5 @@ pub(crate) const COMMANDS: [&dyn Command; 10] = [
     &DeleteCommand {},
     &EditCommand {},
     &ClearCommand {},
+    &ShowCommand {},
 ];

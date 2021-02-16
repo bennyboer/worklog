@@ -7,6 +7,7 @@ mod finish;
 mod list;
 mod log;
 mod pause;
+mod show;
 mod start;
 
 mod command;

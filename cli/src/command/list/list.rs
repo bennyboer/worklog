@@ -76,13 +76,7 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
 
     let mut last_date_option: Option<chrono::Date<_>> = None;
     for item in &entries {
-        let date_time: chrono::DateTime<chrono::Utc> = chrono::DateTime::from_utc(
-            chrono::NaiveDateTime::from_timestamp(item.created_timestamp() / 1000, 0),
-            chrono::Utc,
-        );
-
-        // Adjust UTC date time to the local timezone
-        let date_time: chrono::DateTime<chrono::Local> = chrono::DateTime::from(date_time);
+        let date_time = item.get_local_date_time();
 
         let display_date = match last_date_option {
             Some(last_date) => date_time.date().sub(last_date).num_days().abs() >= 1,
@@ -126,17 +120,6 @@ fn format_item(item: &WorkItem, date_time: &chrono::DateTime<chrono::Local>) -> 
     let status_str = match item.status() {
         Status::Done => duration_str,
         Status::InProgress => {
-            // Calculate current time of the work item
-            let timer_timestamp = item
-                .events()
-                .last()
-                .expect("Must have an in-progress event at this point!")
-                .timestamp();
-            let time_taken =
-                item.time_taken() + (chrono::Utc::now().timestamp_millis() - timer_timestamp);
-            let duration_str =
-                util::format_duration((time_taken / 1000) as u32).color(colorful::Color::Orange1);
-
             format!("IN PROGRESS ({})", duration_str).color(colorful::Color::GreenYellow)
         }
         Status::Paused => format!("PAUSED ({})", duration_str).color(colorful::Color::Red),
