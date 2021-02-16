@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cmd_args::{arg, option, Group};
 
-use persistence::work_item::Status;
+use persistence::calc::Status;
 
 use crate::command::command::Command;
 

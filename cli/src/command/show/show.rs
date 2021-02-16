@@ -2,7 +2,7 @@ use crate::command::command::Command;
 use crate::util;
 use cmd_args::{arg, option, Group};
 use colorful::Colorful;
-use persistence::work_item::WorkItem;
+use persistence::calc::WorkItem;
 use std::collections::HashMap;
 
 /// Command used to show details about a work item.

@@ -1,10 +1,10 @@
 use std::error::Error;
 
-use crate::work_item::{Status, WorkItem};
+use crate::calc::{Status, WorkItem};
 
 /// Common data access interface.
 pub trait DataAccess {
-    /// Log a work work_item.
+    /// Log a work calc.
     /// Will return the ID of the new work item.
     fn log_item(&mut self, item: WorkItem) -> Result<i32, Box<dyn Error>>;
 

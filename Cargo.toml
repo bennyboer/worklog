@@ -4,5 +4,6 @@ members = [
     "persistence",
     "export",
     "cli",
-    "ui"
+    "ui",
+    "shared"
 ]

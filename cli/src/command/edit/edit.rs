@@ -1,6 +1,6 @@
 use crate::command::command::Command;
 use cmd_args::{arg, option, Group};
-use persistence::work_item::WorkItem;
+use persistence::calc::WorkItem;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::iter::FromIterator;

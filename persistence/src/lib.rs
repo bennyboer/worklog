@@ -1,13 +1,13 @@
 use std::error::Error;
 
-use work_item::WorkItem;
+use calc::WorkItem;
 
-use crate::work_item::Status;
+use crate::calc::Status;
 
+pub mod calc;
 mod data_access;
-pub mod work_item;
 
-/// Log a work work_item.
+/// Log a work calc.
 /// Will return the ID of the new item.
 pub fn log_item(item: WorkItem) -> Result<i32, Box<dyn Error>> {
     let mut data_access = data_access::get_data_access()?;

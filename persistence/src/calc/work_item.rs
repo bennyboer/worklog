@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-use crate::work_item::event::{Event, EventType};
-use crate::work_item::Status;
+use crate::calc::event::{Event, EventType};
+use crate::calc::Status;
 
 #[derive(Debug)]
 pub struct WorkItem {
@@ -19,7 +19,7 @@ pub struct WorkItem {
 }
 
 impl WorkItem {
-    /// Create a new log work_item.
+    /// Create a new log calc.
     pub fn new(description: String, status: Status, tags: HashSet<String>) -> WorkItem {
         WorkItem {
             id: None,
@@ -30,7 +30,7 @@ impl WorkItem {
         }
     }
 
-    /// Create a new log work_item for internal use.
+    /// Create a new log calc for internal use.
     pub fn new_internal(
         id: i32,
         description: String,

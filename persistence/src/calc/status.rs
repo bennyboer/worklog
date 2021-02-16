@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str;
 
-/// Status of a log work_item.
+/// Status of a log calc.
 #[derive(Debug, Copy, Clone)]
 pub enum Status {
     Done,

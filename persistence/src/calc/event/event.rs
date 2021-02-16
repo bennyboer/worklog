@@ -1,4 +1,4 @@
-use crate::work_item::event::EventType;
+use crate::calc::event::EventType;
 
 /// Event that may occur on a work item.
 #[derive(Debug)]
@@ -27,6 +27,14 @@ impl Event {
     /// When did the event occur?
     pub fn timestamp(&self) -> i64 {
         self.timestamp
+    }
+
+    /// Whether the event denotes a start of something or an end.
+    pub fn is_start(&self) -> bool {
+        match self.event_type {
+            EventType::Started | EventType::Continued => true,
+            _ => false,
+        }
     }
 
     /// Get local date time for the events created timestamp.

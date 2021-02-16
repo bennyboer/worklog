@@ -2,8 +2,8 @@ use crate::command::command::Command;
 use crate::util;
 use cmd_args::{arg, option, Group};
 use colorful::Colorful;
-use persistence::work_item::event::{Event, EventType};
-use persistence::work_item::Status;
+use persistence::calc::event::{Event, EventType};
+use persistence::calc::Status;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 
@@ -46,7 +46,7 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
     let time_taken_ms = util::parse_duration(time_taken_str).unwrap() as i64 * 1000;
 
     let current_timestamp_ms = chrono::Utc::now().timestamp_millis();
-    let item = persistence::work_item::WorkItem::new_internal(
+    let item = persistence::calc::WorkItem::new_internal(
         -1,
         description.to_owned(),
         Status::Done,

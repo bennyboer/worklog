@@ -4,7 +4,7 @@ use std::iter::FromIterator;
 use cmd_args::{arg, option, Group};
 use colorful::Colorful;
 
-use persistence::work_item::Status;
+use persistence::calc::Status;
 
 use crate::command::command::Command;
 use crate::command::{finish, pause};
@@ -66,7 +66,7 @@ fn execute(args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
         finish::finish_all_paused_work_items();
     }
 
-    let item = persistence::work_item::WorkItem::new(
+    let item = persistence::calc::WorkItem::new(
         description.to_owned(),
         Status::InProgress,
         HashSet::from_iter(tags.into_iter()),

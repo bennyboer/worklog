@@ -5,10 +5,10 @@ use std::{fs, path};
 
 use rusqlite::{params, Connection, Rows, Transaction, NO_PARAMS};
 
+use crate::calc::event::{Event, EventType};
+use crate::calc::{Status, WorkItem};
 use crate::data_access::sqlite::patch::Patcher;
 use crate::data_access::DataAccess;
-use crate::work_item::event::{Event, EventType};
-use crate::work_item::{Status, WorkItem};
 use std::collections::hash_map::Entry;
 
 /// Latest database version to patch to.
@@ -117,7 +117,7 @@ impl DataAccess for SQLiteDataAccess {
             params![item.description(), format!("{}", item.status())],
         )?;
 
-        // Check ID of the new log work_item
+        // Check ID of the new log calc
         let id: i32 =
             transaction.query_row("SELECT last_insert_rowid()", NO_PARAMS, |row| row.get(0))?;
 
