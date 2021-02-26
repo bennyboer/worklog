@@ -1,11 +1,13 @@
 use crate::state::work_item::UiWorkItemStatus;
 use crate::state::{work_item, DayViewState};
+use crate::util::icon;
+use crate::widget::button::UiButton;
 use crate::widget::day_view::controller;
 use crate::widget::day_view::work_item::WorkItemListItemWidget;
 use crate::{state, Size};
 use druid::widget::{
-    Button, ControllerHost, CrossAxisAlignment, Flex, IdentityWrapper, Label, LensWrap, List,
-    MainAxisAlignment, Painter, Scroll,
+    ControllerHost, CrossAxisAlignment, Flex, IdentityWrapper, Label, LensWrap, List,
+    MainAxisAlignment, Painter, Scroll, Svg,
 };
 use druid::{
     BoxConstraints, Color, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
@@ -103,18 +105,29 @@ fn build_work_item_status_panel() -> impl Widget<work_item::UiWorkItemStatus> {
 
 /// Build the header of the day view.
 fn build_header() -> impl Widget<Rc<chrono::Date<chrono::Local>>> {
+    let arrow_left_svg = icon::get_icon(icon::ARROW_LEFT);
+    let arrow_right_svg = icon::get_icon(icon::ARROW_RIGHT);
+
     Flex::row()
         .main_axis_alignment(MainAxisAlignment::SpaceBetween)
         .with_spacer(10.0)
-        .with_child(Button::new("<").on_click(|ctx, _, _| {
-            ctx.submit_command(controller::PREV_DAY.to(controller::DAY_VIEW_WIDGET_ID))
-        }))
+        .with_child(
+            UiButton::new(Svg::new(arrow_left_svg).fix_width(18.0).padding(8.0))
+                .with_corner_radius(100.0)
+                .on_click(|ctx, _, _| {
+                    ctx.submit_command(controller::PREV_DAY.to(controller::DAY_VIEW_WIDGET_ID))
+                }),
+        )
         .with_flex_spacer(1.0)
         .with_child(build_header_date_label())
         .with_flex_spacer(1.0)
-        .with_child(Button::new(">").on_click(|ctx, _, _| {
-            ctx.submit_command(controller::NEXT_DAY.to(controller::DAY_VIEW_WIDGET_ID))
-        }))
+        .with_child(
+            UiButton::new(Svg::new(arrow_right_svg).fix_width(18.0).padding(8.0))
+                .with_corner_radius(100.0)
+                .on_click(|ctx, _, _| {
+                    ctx.submit_command(controller::NEXT_DAY.to(controller::DAY_VIEW_WIDGET_ID))
+                }),
+        )
         .with_spacer(10.0)
         .padding((0.0, 10.0))
 }

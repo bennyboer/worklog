@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod state;
-mod util;
+pub(crate) mod util;
 mod widget;
 
 use crate::widget::day_view;
@@ -59,7 +59,7 @@ where
     window_description
         .resizable(true)
         .window_size(initial_window_size)
-        .with_min_size((400.0, 300.0))
+        .with_min_size((500.0, 300.0))
         .set_position(window_position)
         .title(APP_TITLE)
 }

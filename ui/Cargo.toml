@@ -5,7 +5,7 @@ authors = ["Benjamin Eder <barny.eder@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-druid = { git = "https://github.com/linebender/druid.git", features = ["im"] }
+druid = { git = "https://github.com/linebender/druid.git", features = ["im", "svg"] }
 chrono = "0.4.19"
 persistence = { path = "../persistence" }
 shared = { path = "../shared" }
