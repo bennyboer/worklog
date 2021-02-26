@@ -6,7 +6,7 @@ use crate::widget::day_view::controller;
 use crate::widget::day_view::work_item::WorkItemListItemWidget;
 use crate::{state, Size};
 use druid::widget::{
-    ControllerHost, CrossAxisAlignment, Flex, IdentityWrapper, Label, LensWrap, List,
+    ControllerHost, CrossAxisAlignment, Flex, IdentityWrapper, Label, LensWrap, LineBreaking, List,
     MainAxisAlignment, Painter, Scroll, Svg,
 };
 use druid::{
@@ -63,7 +63,8 @@ fn build_work_item_widget() -> impl Widget<work_item::UiWorkItem> {
                         Label::new(|item: &work_item::UiWorkItem, _env: &_| {
                             format!("{}", item.description)
                         })
-                        .with_text_size(18.0),
+                        .with_text_size(18.0)
+                        .with_line_break_mode(LineBreaking::Clip),
                     )
                     .with_child(
                         Label::new(|item: &work_item::UiWorkItem, _env: &_| {
@@ -82,7 +83,7 @@ fn build_work_item_widget() -> impl Widget<work_item::UiWorkItem> {
                 1.0,
             ),
     )
-    .fix_height(50.0)
+    .fix_height(60.0)
     .background(Color::WHITE)
     .rounded(2.0)
     .padding((10.0, 4.0))
