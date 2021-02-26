@@ -4,19 +4,19 @@ use druid::{
     PaintCtx, RenderContext, UpdateCtx, Widget, WidgetPod,
 };
 
-pub(crate) struct ListItemWidget<T> {
+pub(crate) struct WorkItemListItemWidget<T> {
     child: WidgetPod<T, Box<dyn Widget<T>>>,
 }
 
-impl<T> ListItemWidget<T> {
-    pub fn new(child: impl Widget<T> + 'static) -> ListItemWidget<T> {
-        ListItemWidget {
+impl<T> WorkItemListItemWidget<T> {
+    pub fn new(child: impl Widget<T> + 'static) -> WorkItemListItemWidget<T> {
+        WorkItemListItemWidget {
             child: WidgetPod::new(child).boxed(),
         }
     }
 }
 
-impl<T: Data> Widget<T> for ListItemWidget<T> {
+impl<T: Data> Widget<T> for WorkItemListItemWidget<T> {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
         self.child.event(ctx, event, data, env);
     }

@@ -1,3 +1,1 @@
-mod list_item_widget;
-
-pub(crate) use list_item_widget::ListItemWidget;
+pub(crate) mod day_view;
