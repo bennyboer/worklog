@@ -1,5 +1,4 @@
 use crate::command::command::Command;
-use crate::util;
 use cmd_args::{arg, option, Group};
 use colorful::Colorful;
 use persistence::calc::event::{Event, EventType};
@@ -43,7 +42,7 @@ fn execute(args: &Vec<arg::Value>, _options: &HashMap<&str, option::Value>) {
     let time_taken_str = args[2].str().unwrap();
 
     let tags: Vec<String> = tags_str.split(",").map(|s| s.trim().to_owned()).collect();
-    let time_taken_ms = util::parse_duration(time_taken_str).unwrap() as i64 * 1000;
+    let time_taken_ms = shared::time::parse_duration(time_taken_str).unwrap() as i64 * 1000;
 
     let current_timestamp_ms = chrono::Utc::now().timestamp_millis();
     let item = persistence::calc::WorkItem::new_internal(

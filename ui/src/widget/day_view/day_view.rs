@@ -50,7 +50,6 @@ fn build_day_view_work_items() -> impl Widget<state::DayViewWorkItems> {
 
 fn build_work_item_widget() -> impl Widget<work_item::UiWorkItem> {
     WorkItemListItemWidget::new()
-        .fix_height(60.0)
         .background(Color::WHITE)
         .rounded(2.0)
         .padding((10.0, 4.0))

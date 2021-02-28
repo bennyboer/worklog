@@ -1,5 +1,4 @@
 use crate::command::command::Command;
-use crate::util;
 use cmd_args::{arg, option, Group};
 use colorful::Colorful;
 use persistence::calc::WorkItem;
@@ -82,9 +81,7 @@ fn print_item(item: WorkItem) {
         println!(
             "  • [{}] at {}",
             format!("{}", event.event_type()).color(colorful::Color::DarkSlateGray1),
-            event
-                .get_local_date_time()
-                .format("%H:%M:%S - %A, %Y-%m-%d")
+            shared::time::get_local_date_time(event.timestamp()).format("%H:%M:%S - %A, %Y-%m-%d")
         );
     }
 
@@ -94,7 +91,7 @@ fn print_item(item: WorkItem) {
 
     println!(
         "  • Total time in progress: {}",
-        util::format_duration((item.time_taken() / 1000) as u32)
+        shared::time::format_duration((item.time_taken() / 1000) as u32)
     );
 
     println!();

@@ -191,17 +191,6 @@ impl WorkItem {
             Status::Done => Err("Cannot finish working on work item already finished!"),
         }
     }
-
-    /// Get local date time for a work items created timestamp.
-    pub fn get_local_date_time(&self) -> chrono::DateTime<chrono::Local> {
-        let date_time: chrono::DateTime<chrono::Utc> = chrono::DateTime::from_utc(
-            chrono::NaiveDateTime::from_timestamp(self.created_timestamp() / 1000, 0),
-            chrono::Utc,
-        );
-
-        // Adjust UTC date time to the local timezone
-        chrono::DateTime::from(date_time)
-    }
 }
 
 /// Get the current UTC+0 timestamp in milliseconds.

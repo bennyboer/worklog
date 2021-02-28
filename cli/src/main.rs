@@ -2,7 +2,6 @@ use cmd_args::{parser, Group};
 use std::process;
 
 mod command;
-mod util;
 
 fn main() {
     let mut group = Group::new(

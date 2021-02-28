@@ -4,6 +4,7 @@ use druid::{theme, Color, Env};
 pub fn configure_theme(env: &mut Env) {
     configure_button_theme(env);
     configure_label_theme(env);
+    configure_scrollbar_theme(env);
 }
 
 /// Configure the button theme.
@@ -17,4 +18,10 @@ pub fn configure_button_theme(env: &mut Env) {
 /// Configure the label theme.
 pub fn configure_label_theme(env: &mut Env) {
     env.set(theme::LABEL_COLOR, Color::rgb8(20, 20, 20));
+}
+
+/// Configure the scrollbar theme.
+pub fn configure_scrollbar_theme(env: &mut Env) {
+    env.set(theme::SCROLLBAR_BORDER_COLOR, Color::rgb8(40, 40, 40));
+    env.set(theme::SCROLLBAR_COLOR, Color::rgb8(40, 40, 40));
 }

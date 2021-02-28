@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::ops::Sub;
 
 use cmd_args::{arg, option, Group};
 use colorful::Colorful;
@@ -7,7 +6,7 @@ use colorful::Colorful;
 use persistence::calc::{Status, WorkItem};
 
 use crate::command::command::Command;
-use crate::util;
+use std::ops::Sub;
 
 /// Command used to list work items.
 pub struct ListCommand {}
@@ -79,7 +78,7 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
     items_per_day.push(Vec::new());
     let mut last_date_option: Option<chrono::Date<_>> = None;
     for item in &entries {
-        let date_time = item.get_local_date_time();
+        let date_time = shared::time::get_local_date_time(item.created_timestamp());
 
         let is_another_day = match last_date_option {
             Some(last_date) => date_time.date().sub(last_date).num_days().abs() >= 1,
@@ -113,7 +112,7 @@ fn execute(_args: &Vec<arg::Value>, options: &HashMap<&str, option::Value>) {
 /// Print the header for a new date.
 fn print_date_header(items: &[&WorkItem]) {
     let first = *items.first().unwrap();
-    let date_time = first.get_local_date_time();
+    let date_time = shared::time::get_local_date_time(first.created_timestamp());
 
     println!();
     println!(
@@ -121,7 +120,7 @@ fn print_date_header(items: &[&WorkItem]) {
         format!(
             "# {} ({})",
             date_time.format("%A - %d. %B %Y"),
-            util::format_duration((calculate_total_work_time(items) / 1000) as u32)
+            shared::time::format_duration((calculate_total_work_time(items) / 1000) as u32)
         )
         .underlined()
     );
@@ -160,16 +159,15 @@ fn format_item(item: &WorkItem) -> String {
     )
     .color(colorful::Color::DodgerBlue3);
 
-    let time_str = item
-        .get_local_date_time()
+    let time_str = shared::time::get_local_date_time(item.created_timestamp())
         .format("%H:%M")
         .to_string()
         .color(colorful::Color::DeepPink1a);
 
     let description = item.description();
 
-    let duration_str =
-        util::format_duration((item.time_taken() / 1000) as u32).color(colorful::Color::Orange1);
+    let duration_str = shared::time::format_duration((item.time_taken() / 1000) as u32)
+        .color(colorful::Color::Orange1);
     let status_str = match item.status() {
         Status::Done => duration_str,
         Status::InProgress => {

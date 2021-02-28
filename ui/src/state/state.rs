@@ -60,7 +60,7 @@ fn load_work_items(
     let items = persistence::find_items_by_timerange(from_timestamp, to_timestamp)?;
 
     let mut ui_work_items = im::Vector::new();
-    for item in &items {
+    for item in items {
         ui_work_items.push_back(work_item::UiWorkItem {
             id: item.id().unwrap(),
             description: item.description().to_owned(),
@@ -69,6 +69,8 @@ fn load_work_items(
                 Status::InProgress => work_item::UiWorkItemStatus::InProgress,
                 Status::Paused => work_item::UiWorkItemStatus::Paused,
             },
+            tags: im::Vector::from(item.tags()),
+            work_item: Rc::new(item),
         });
     }
 

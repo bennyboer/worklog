@@ -1,6 +1,6 @@
 /// Parse the time taken in seconds from the given string in the format
 /// "Xh Xm Xs" where X must be a number and h, m or s are optional.
-pub(crate) fn parse_duration(src: &str) -> Result<i32, String> {
+pub fn parse_duration(src: &str) -> Result<i32, String> {
     let mut hours = 0;
     let mut minutes = 0;
     let mut seconds = 0;
@@ -41,7 +41,7 @@ pub(crate) fn parse_duration(src: &str) -> Result<i32, String> {
 }
 
 /// Format a duration given in seconds in the form "Xh Xm Xs".
-pub(crate) fn format_duration(mut seconds: u32) -> String {
+pub fn format_duration(mut seconds: u32) -> String {
     let hours = seconds / 60 / 60;
     seconds -= hours * 60 * 60;
 

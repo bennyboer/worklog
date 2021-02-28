@@ -1,6 +1,5 @@
 use crate::command::command::Command;
 use crate::command::list;
-use crate::util;
 use cmd_args::{arg, option, Group};
 use persistence::calc::event::EventType;
 use persistence::calc::WorkItem;
@@ -69,7 +68,7 @@ fn export_to_markdown(file_path: &str, filter: String) {
     let items = persistence::find_items_by_timerange(from_timestamp, to_timestamp).unwrap();
 
     let first_item = items.first().unwrap();
-    let date_time = first_item.get_local_date_time();
+    let date_time = shared::time::get_local_date_time(first_item.created_timestamp());
 
     let mut data = String::new();
 
@@ -85,16 +84,16 @@ fn export_to_markdown(file_path: &str, filter: String) {
         let item_refs: Vec<&WorkItem> = items.iter().collect();
         let total_work_time_ms = list::calculate_total_work_time(&item_refs);
 
-        util::format_duration((total_work_time_ms / 1000) as u32)
+        shared::time::format_duration((total_work_time_ms / 1000) as u32)
     };
-    let start_time = find_earliest_work_item(&items)
-        .get_local_date_time()
-        .format("%H:%M")
-        .to_string();
-    let end_time = find_latest_work_item(&items)
-        .get_local_date_time()
-        .format("%H:%M")
-        .to_string();
+    let start_time =
+        shared::time::get_local_date_time(find_earliest_work_item(&items).created_timestamp())
+            .format("%H:%M")
+            .to_string();
+    let end_time =
+        shared::time::get_local_date_time(find_latest_work_item(&items).created_timestamp())
+            .format("%H:%M")
+            .to_string();
 
     data.push_str(&format!(
         "\
@@ -110,7 +109,7 @@ fn export_to_markdown(file_path: &str, filter: String) {
         data.push_str(&format!(
             "- {}. Took `{}` ({}). Tags: *{}*.\n",
             item.description(),
-            util::format_duration((item.time_taken() / 1000) as u32),
+            shared::time::format_duration((item.time_taken() / 1000) as u32),
             format_event_timeline(item),
             item.tags().join(", ")
         ));
@@ -126,12 +125,12 @@ fn format_event_timeline(item: &WorkItem) -> String {
     for event in item.events() {
         match event.event_type() {
             EventType::Started | EventType::Continued => {
-                start_time = Some(event.get_local_date_time())
+                start_time = Some(shared::time::get_local_date_time(event.timestamp()))
             }
             EventType::Finished | EventType::Paused => result.push(format!(
                 "{} - {}",
                 start_time.unwrap().format("%H:%M"),
-                event.get_local_date_time().format("%H:%M")
+                shared::time::get_local_date_time(event.timestamp()).format("%H:%M")
             )),
         };
     }

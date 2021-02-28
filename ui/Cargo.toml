@@ -10,3 +10,4 @@ chrono = "0.4.19"
 persistence = { path = "../persistence" }
 shared = { path = "../shared" }
 im = "15.0.0"
+rand = "0.8.3"
