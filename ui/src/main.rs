@@ -7,6 +7,7 @@ mod widget;
 
 use crate::widget::day_view;
 use druid::widget::{CrossAxisAlignment, Flex, LensWrap};
+use druid::LinearGradient;
 pub use druid::{im, RenderContext, Selector, WidgetId};
 pub use druid::{
     lens, AppLauncher, Color, Data, LensExt, Point, Screen, Size, UnitPoint, Widget, WidgetExt,
@@ -72,7 +73,11 @@ fn build_root_widget() -> impl Widget<state::UiState> {
             LensWrap::new(day_view::DayViewWidget::new(), state::UiState::day),
             1.0,
         )
-        .background(Color::rgb8(250, 250, 250))
+        .background(LinearGradient::new(
+            UnitPoint::TOP,
+            UnitPoint::BOTTOM,
+            (Color::rgb8(255, 255, 255), Color::rgb8(220, 230, 240)),
+        ))
         .env_scope(|env, _| {
             util::ui::env::configure_environment(env);
         })
