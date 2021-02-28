@@ -1,4 +1,3 @@
-use crate::state::work_item::UiWorkItemStatus;
 use crate::state::{work_item, DayViewState};
 use crate::util::icon;
 use crate::widget::button::UiButton;
@@ -6,12 +5,11 @@ use crate::widget::day_view::controller;
 use crate::widget::day_view::work_item::WorkItemListItemWidget;
 use crate::{state, Size};
 use druid::widget::{
-    ControllerHost, CrossAxisAlignment, Flex, IdentityWrapper, Label, LensWrap, LineBreaking, List,
-    MainAxisAlignment, Painter, Scroll, Svg,
+    ControllerHost, Flex, IdentityWrapper, Label, LensWrap, List, MainAxisAlignment, Scroll, Svg,
 };
 use druid::{
     BoxConstraints, Color, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
-    RenderContext, UpdateCtx, Widget, WidgetExt, WidgetPod,
+    UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 use std::rc::Rc;
 
@@ -51,57 +49,11 @@ fn build_day_view_work_items() -> impl Widget<state::DayViewWorkItems> {
 }
 
 fn build_work_item_widget() -> impl Widget<work_item::UiWorkItem> {
-    WorkItemListItemWidget::new(
-        Flex::row()
-            .main_axis_alignment(MainAxisAlignment::Start)
-            .with_child(build_work_item_status_panel().lens(work_item::UiWorkItem::status))
-            .with_spacer(10.0)
-            .with_flex_child(
-                Flex::column()
-                    .cross_axis_alignment(CrossAxisAlignment::Start)
-                    .with_child(
-                        Label::new(|item: &work_item::UiWorkItem, _env: &_| {
-                            format!("{}", item.description)
-                        })
-                        .with_text_size(18.0)
-                        .with_line_break_mode(LineBreaking::Clip),
-                    )
-                    .with_child(
-                        Label::new(|item: &work_item::UiWorkItem, _env: &_| {
-                            format!(
-                                "{}",
-                                match item.status {
-                                    UiWorkItemStatus::InProgress => "In progress",
-                                    UiWorkItemStatus::Paused => "Paused",
-                                    UiWorkItemStatus::Finished => "Done",
-                                }
-                            )
-                        })
-                        .with_text_size(12.0)
-                        .with_text_color(Color::rgb8(100, 100, 100)),
-                    ),
-                1.0,
-            ),
-    )
-    .fix_height(60.0)
-    .background(Color::WHITE)
-    .rounded(2.0)
-    .padding((10.0, 4.0))
-}
-
-fn build_work_item_status_panel() -> impl Widget<work_item::UiWorkItemStatus> {
-    Painter::new(|ctx, status: &work_item::UiWorkItemStatus, _: &_| {
-        let size = ctx.size().to_rounded_rect(2.0);
-
-        let color = match *status {
-            UiWorkItemStatus::InProgress => Color::rgb8(130, 200, 50),
-            UiWorkItemStatus::Paused => Color::rgb8(216, 139, 100),
-            UiWorkItemStatus::Finished => Color::rgb8(100, 177, 216),
-        };
-
-        ctx.fill(size, &color)
-    })
-    .fix_width(4.0)
+    WorkItemListItemWidget::new()
+        .fix_height(60.0)
+        .background(Color::WHITE)
+        .rounded(2.0)
+        .padding((10.0, 4.0))
 }
 
 /// Build the header of the day view.
