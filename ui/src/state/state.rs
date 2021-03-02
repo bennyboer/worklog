@@ -20,7 +20,7 @@ pub(crate) struct DayViewState {
     pub date: Rc<chrono::Date<chrono::Local>>,
     /// Reference to a list of work items.
     /// If None, the work items have not yet been loaded for the set date.
-    pub work_items: DayViewWorkItems,
+    pub work_items: Option<DayViewWorkItems>,
 }
 
 impl DayViewState {
@@ -28,18 +28,14 @@ impl DayViewState {
     pub fn new(date: chrono::Date<chrono::Local>) -> DayViewState {
         DayViewState {
             date: Rc::new(date),
-            work_items: load_work_items(&date)
-                .map(|v| DayViewWorkItems { items: v })
-                .unwrap(),
+            work_items: load_work_items(&date).expect("Could not load work items"),
         }
     }
 
     /// Update the day view state for the given date.
     pub fn update(&mut self, new_date: chrono::Date<chrono::Local>) {
         self.date = Rc::from(new_date);
-        self.work_items = load_work_items(&new_date)
-            .map(|v| DayViewWorkItems { items: v })
-            .unwrap();
+        self.work_items = load_work_items(&new_date).expect("Could not load work items")
     }
 }
 
@@ -53,11 +49,15 @@ pub(crate) struct DayViewWorkItems {
 /// Load work items for the given date.
 fn load_work_items(
     date: &chrono::Date<chrono::Local>,
-) -> Result<im::Vector<work_item::UiWorkItem>, Box<dyn Error>> {
+) -> Result<Option<DayViewWorkItems>, Box<dyn Error>> {
     let from_timestamp = date.and_hms(0, 0, 0).timestamp_millis();
     let to_timestamp = date.succ().and_hms(0, 0, 0).timestamp_millis();
 
     let items = persistence::find_items_by_timerange(from_timestamp, to_timestamp)?;
+
+    if items.is_empty() {
+        return Ok(None);
+    }
 
     let mut ui_work_items = im::Vector::new();
     for item in items {
@@ -74,5 +74,7 @@ fn load_work_items(
         });
     }
 
-    Ok(ui_work_items)
+    Ok(Some(DayViewWorkItems {
+        items: ui_work_items,
+    }))
 }

@@ -5,11 +5,12 @@ use crate::widget::day_view::controller;
 use crate::widget::day_view::work_item::WorkItemListItemWidget;
 use crate::{state, Size};
 use druid::widget::{
-    ControllerHost, Flex, IdentityWrapper, Label, LensWrap, List, MainAxisAlignment, Scroll, Svg,
+    ControllerHost, Flex, IdentityWrapper, Label, LensWrap, LineBreaking, List, MainAxisAlignment,
+    Maybe, Scroll, Svg,
 };
 use druid::{
-    BoxConstraints, Color, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx, PaintCtx,
-    UpdateCtx, Widget, WidgetExt, WidgetPod,
+    lens, BoxConstraints, Color, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx,
+    PaintCtx, TextAlignment, UpdateCtx, Widget, WidgetExt, WidgetPod,
 };
 use std::rc::Rc;
 
@@ -29,7 +30,11 @@ impl DayViewWidget {
                     .with_child(LensWrap::new(build_header(), state::DayViewState::date))
                     .with_spacer(10.0)
                     .with_flex_child(
-                        LensWrap::new(build_day_view_work_items(), state::DayViewState::work_items),
+                        Maybe::new(
+                            || build_day_view_work_items(),
+                            || build_placeholder().lens(lens::Unit),
+                        )
+                        .lens(state::DayViewState::work_items),
                         1.0,
                     )
                     .boxed(),
@@ -38,6 +43,23 @@ impl DayViewWidget {
         .controller(controller::DayViewController)
         .with_id(controller::DAY_VIEW_WIDGET_ID)
     }
+}
+
+/// Build placeholder for no items.
+fn build_placeholder() -> impl Widget<()> {
+    Flex::column()
+        .main_axis_alignment(MainAxisAlignment::Center)
+        .with_child(Svg::new(icon::get_icon(icon::SLOTH)).fix_height(150.0))
+        .with_spacer(30.0)
+        .with_child(
+            Label::new("No work items for the day!")
+                .with_text_size(24.0)
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .with_text_alignment(TextAlignment::Center)
+                .with_text_color(Color::rgb8(100, 100, 100))
+                .fix_width(300.0),
+        )
+        .expand_height()
 }
 
 fn build_day_view_work_items() -> impl Widget<state::DayViewWorkItems> {
