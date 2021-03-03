@@ -3,17 +3,21 @@ use crate::util::icon;
 use crate::widget::button::UiButton;
 use crate::widget::day_view::controller;
 use crate::widget::day_view::work_item::WorkItemListItemWidget;
+use crate::widget::sidebar::{SideBar, OPEN_SIDEBAR};
 use crate::widget::stack::Stack;
 use crate::{state, Size};
 use druid::widget::{
-    Click, Controller, ControllerHost, Flex, IdentityWrapper, Label, LensWrap, LineBreaking, List,
-    MainAxisAlignment, Maybe, Padding, Scroll, SizedBox, Svg,
+    ControllerHost, Flex, IdentityWrapper, Label, LensWrap, LineBreaking, List, MainAxisAlignment,
+    Maybe, Padding, Scroll, SizedBox, Svg,
 };
 use druid::{
-    lens, BoxConstraints, Color, Data, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx,
-    PaintCtx, TextAlignment, UpdateCtx, Widget, WidgetExt, WidgetPod,
+    lens, BoxConstraints, Color, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx,
+    PaintCtx, TextAlignment, UpdateCtx, Widget, WidgetExt, WidgetId, WidgetPod,
 };
 use std::rc::Rc;
+
+/// Widget ID of the sidebar.
+const SIDEBAR_WIDGET_ID: WidgetId = WidgetId::reserved(2);
 
 /// Widget displaying work items for a day.
 pub(crate) struct DayViewWidget {
@@ -41,7 +45,9 @@ impl DayViewWidget {
                                 1.0,
                             ),
                     )
-                    .with_child(build_detail_view().lens(state::DayViewState::selected_work_item))
+                    .with_child(
+                        build_detail_view_wrapper().lens(state::DayViewState::selected_work_item),
+                    )
                     .boxed(),
             ),
         }
@@ -51,45 +57,40 @@ impl DayViewWidget {
 }
 
 /// Build the detail view of a work item (if one is selected).
-fn build_detail_view() -> impl Widget<Option<Rc<state::work_item::UiWorkItem>>> {
+fn build_detail_view_wrapper() -> impl Widget<Option<Rc<state::work_item::UiWorkItem>>> {
     Maybe::new(
         || {
-            Flex::row()
-                .main_axis_alignment(MainAxisAlignment::End)
-                .with_flex_child(
-                    SizedBox::empty()
-                        .expand()
-                        .background(Color::rgba(0.0, 0.0, 0.0, 0.3))
-                        .controller(CatchMouseEventController)
-                        .controller(Click::new(|ctx, _, _| {
-                            ctx.submit_command(
-                                controller::SELECT_ITEM
-                                    .with(-1)
-                                    .to(controller::DAY_VIEW_WIDGET_ID),
-                            )
-                        })),
-                    1.0,
-                )
-                .with_child(
-                    Padding::new(
-                        10.0,
-                        Flex::column()
-                            .with_child(Label::new(
-                                |data: &Rc<state::work_item::UiWorkItem>, _: &Env| {
-                                    let item = data.as_ref();
-                                    format!("Details for {}", item.id)
-                                },
-                            ))
-                            .with_child(UiButton::new(Label::new("Hello World"))),
-                    )
-                    .background(Color::WHITE)
-                    .expand_height()
-                    .controller(CatchMouseEventController),
-                )
-                .expand()
+            SideBar::new(build_detail_view(), false, true, |ctx, _, _| {
+                ctx.submit_command(
+                    controller::SELECT_ITEM
+                        .with(-1)
+                        .to(controller::DAY_VIEW_WIDGET_ID),
+                );
+            })
         },
         || SizedBox::empty().lens(lens::Unit),
     )
+    .with_id(SIDEBAR_WIDGET_ID)
+}
+
+fn build_detail_view() -> impl Widget<Rc<state::work_item::UiWorkItem>> {
+    Padding::new(
+        10.0,
+        Flex::column()
+            .with_child(
+                Label::new(|data: &Rc<state::work_item::UiWorkItem>, _: &Env| {
+                    let item = data.as_ref();
+                    item.description.to_owned()
+                })
+                .with_line_break_mode(LineBreaking::WordWrap)
+                .with_text_size(18.0),
+            )
+            .with_child(UiButton::new(Label::new("Hello World")))
+            .with_child(Label::new("More details about the work item go here...")),
+    )
+    .background(Color::WHITE)
+    .fix_width(400.0)
+    .expand_height()
 }
 
 /// Build placeholder for no items.
@@ -127,6 +128,7 @@ fn build_work_item_widget() -> impl Widget<Rc<work_item::UiWorkItem>> {
                     .with(item.id)
                     .to(controller::DAY_VIEW_WIDGET_ID),
             );
+            ctx.submit_command(OPEN_SIDEBAR.to(SIDEBAR_WIDGET_ID));
         })
         .background(Color::WHITE)
         .rounded(2.0)
@@ -207,19 +209,5 @@ impl Widget<state::DayViewState> for DayViewWidget {
 
     fn paint(&mut self, ctx: &mut PaintCtx, data: &DayViewState, env: &Env) {
         self.child.paint(ctx, data, env);
-    }
-}
-
-struct CatchMouseEventController;
-
-impl<T: Data, W: Widget<T>> Controller<T, W> for CatchMouseEventController {
-    fn event(&mut self, child: &mut W, ctx: &mut EventCtx, event: &Event, data: &mut T, env: &Env) {
-        match event {
-            Event::MouseDown(_) | Event::MouseUp(_) | Event::MouseMove(_) | Event::Wheel(_) => {
-                child.event(ctx, event, data, env);
-                ctx.set_handled()
-            }
-            _ => child.event(ctx, event, data, env),
-        };
     }
 }
