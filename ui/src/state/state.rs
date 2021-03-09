@@ -3,6 +3,7 @@ use crate::state::work_item::UiWorkItem;
 use druid::im;
 use druid::{Data, Lens};
 use persistence::calc::Status;
+use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
 
@@ -19,10 +20,26 @@ pub(crate) struct DayViewState {
     /// Date currently displayed.
     pub date: Rc<chrono::Date<chrono::Local>>,
     /// A currently selected work item.
-    pub selected_work_item: Option<Rc<UiWorkItem>>,
+    pub selected_work_item: Option<Rc<RefCell<UiWorkItem>>>,
     /// Reference to a list of work items.
     /// If None, the work items have not yet been loaded for the set date.
     pub work_items: Option<DayViewWorkItems>,
+}
+
+pub(crate) struct SelectedWorkItemLens;
+
+impl Lens<Rc<RefCell<UiWorkItem>>, UiWorkItem> for SelectedWorkItemLens {
+    fn with<R, F: FnOnce(&UiWorkItem) -> R>(&self, data: &Rc<RefCell<UiWorkItem>>, f: F) -> R {
+        f(&data.as_ref().borrow())
+    }
+
+    fn with_mut<R, F: FnOnce(&mut UiWorkItem) -> R>(
+        &self,
+        data: &mut Rc<RefCell<UiWorkItem>>,
+        f: F,
+    ) -> R {
+        f(&mut data.as_ref().borrow_mut())
+    }
 }
 
 impl DayViewState {
@@ -50,10 +67,11 @@ impl DayViewState {
     }
 
     /// Find a work item with the given ID.
-    fn find_item_with_id(&self, id: i32) -> Option<Rc<UiWorkItem>> {
+    fn find_item_with_id(&self, id: i32) -> Option<Rc<RefCell<UiWorkItem>>> {
         if let Some(items) = &self.work_items {
             for item_ref in &items.items {
-                if item_ref.id == id {
+                let item = item_ref.borrow();
+                if item.id == id {
                     return Some(Rc::clone(item_ref));
                 }
             }
@@ -72,7 +90,7 @@ impl DayViewState {
 #[derive(Clone, Data, Lens)]
 pub(crate) struct DayViewWorkItems {
     /// Work items in the day view.
-    pub items: im::Vector<Rc<UiWorkItem>>,
+    pub items: im::Vector<Rc<RefCell<UiWorkItem>>>,
 }
 
 /// Load work items for the given date.
@@ -90,7 +108,7 @@ fn load_work_items(
 
     let mut ui_work_items = im::Vector::new();
     for item in items {
-        ui_work_items.push_back(Rc::new(work_item::UiWorkItem {
+        ui_work_items.push_back(Rc::new(RefCell::new(work_item::UiWorkItem {
             id: item.id().unwrap(),
             description: item.description().to_owned(),
             status: match item.status() {
@@ -99,8 +117,8 @@ fn load_work_items(
                 Status::Paused => work_item::UiWorkItemStatus::Paused,
             },
             tags: im::Vector::from(item.tags()),
-            work_item: Rc::new(item),
-        }));
+            work_item: Rc::new(RefCell::new(item)),
+        })));
     }
 
     Ok(Some(DayViewWorkItems {

@@ -1,23 +1,29 @@
-use crate::state::{work_item, DayViewState};
+use crate::state::work_item::UiWorkItem;
+use crate::state::{DayViewState, SelectedWorkItemLens};
 use crate::util::icon;
 use crate::widget::button::UiButton;
 use crate::widget::day_view::controller;
-use crate::widget::day_view::work_item::WorkItemListItemWidget;
+use crate::widget::day_view::work_item::{WorkItemListItemWidget, ITEM_CHANGED};
+use crate::widget::editable_field::EditableFieldWidget;
 use crate::widget::sidebar::{SideBar, OPEN_SIDEBAR};
 use crate::widget::stack::Stack;
 use crate::{state, Size};
 use druid::widget::{
-    ControllerHost, Flex, IdentityWrapper, Label, LensWrap, LineBreaking, List, MainAxisAlignment,
-    Maybe, Padding, Scroll, SizedBox, Svg,
+    ControllerHost, CrossAxisAlignment, Flex, IdentityWrapper, Label, LensWrap, LineBreaking, List,
+    MainAxisAlignment, Maybe, Padding, Scroll, SizedBox, Svg, TextBox,
 };
 use druid::{
     lens, BoxConstraints, Color, Env, Event, EventCtx, LayoutCtx, LifeCycle, LifeCycleCtx,
     PaintCtx, TextAlignment, UpdateCtx, Widget, WidgetExt, WidgetId, WidgetPod,
 };
+use std::cell::RefCell;
 use std::rc::Rc;
 
 /// Widget ID of the sidebar.
 const SIDEBAR_WIDGET_ID: WidgetId = WidgetId::reserved(2);
+
+/// Widget ID of the item list.
+const ITEM_LIST_WIDGET_ID: WidgetId = WidgetId::reserved(3);
 
 /// Widget displaying work items for a day.
 pub(crate) struct DayViewWidget {
@@ -57,40 +63,79 @@ impl DayViewWidget {
 }
 
 /// Build the detail view of a work item (if one is selected).
-fn build_detail_view_wrapper() -> impl Widget<Option<Rc<state::work_item::UiWorkItem>>> {
+fn build_detail_view_wrapper() -> impl Widget<Option<Rc<RefCell<UiWorkItem>>>> {
     Maybe::new(
         || {
-            SideBar::new(build_detail_view(), false, true, |ctx, _, _| {
-                ctx.submit_command(
-                    controller::SELECT_ITEM
-                        .with(-1)
-                        .to(controller::DAY_VIEW_WIDGET_ID),
-                );
-            })
+            SideBar::new(
+                build_detail_view().lens(SelectedWorkItemLens),
+                false,
+                true,
+                |ctx, _, _| {
+                    ctx.submit_command(
+                        controller::SELECT_ITEM
+                            .with(-1)
+                            .to(controller::DAY_VIEW_WIDGET_ID),
+                    );
+                },
+            )
         },
         || SizedBox::empty().lens(lens::Unit),
     )
     .with_id(SIDEBAR_WIDGET_ID)
 }
 
-fn build_detail_view() -> impl Widget<Rc<state::work_item::UiWorkItem>> {
+fn build_detail_view() -> impl Widget<UiWorkItem> {
     Padding::new(
         10.0,
         Flex::column()
-            .with_child(
-                Label::new(|data: &Rc<state::work_item::UiWorkItem>, _: &Env| {
-                    let item = data.as_ref();
-                    item.description.to_owned()
-                })
-                .with_line_break_mode(LineBreaking::WordWrap)
-                .with_text_size(18.0),
-            )
+            .main_axis_alignment(MainAxisAlignment::Start)
+            .cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(build_detail_view_title())
+            .with_child(Label::new(|data: &UiWorkItem, _: &Env| {
+                let work_item = data.work_item.as_ref().borrow();
+
+                format!(
+                    "Duration: {}",
+                    shared::time::format_duration((work_item.time_taken() / 1000) as u32)
+                )
+            }))
             .with_child(UiButton::new(Label::new("Hello World")))
             .with_child(Label::new("More details about the work item go here...")),
     )
     .background(Color::WHITE)
     .fix_width(400.0)
     .expand_height()
+}
+
+fn build_detail_view_title() -> impl Widget<UiWorkItem> {
+    let title_edit_id = WidgetId::next();
+
+    let non_editing_widget = Label::new(|data: &UiWorkItem, _: &Env| data.description.to_owned())
+        .with_line_break_mode(LineBreaking::WordWrap)
+        .with_text_size(20.0)
+        .expand_width();
+
+    let editing_widget = TextBox::multiline()
+        .lens(UiWorkItem::description)
+        .expand_width();
+
+    EditableFieldWidget::new(
+        non_editing_widget,
+        editing_widget,
+        |ctx, data: &mut UiWorkItem, _| {
+            // Update work item in backend
+            let mut work_item = data.work_item.borrow_mut();
+            work_item.set_description(data.description.to_owned());
+            persistence::update_items(vec![&work_item]).unwrap();
+
+            // Notify list item that it needs to update as well
+            ctx.submit_command(ITEM_CHANGED.with(data.id).to(ITEM_LIST_WIDGET_ID));
+        },
+    )
+    .with_react_on_enter()
+    .with_react_on_dbl_click()
+    .with_id(title_edit_id)
+    .padding((0.0, 0.0, 0.0, 10.0))
 }
 
 /// Build placeholder for no items.
@@ -112,17 +157,16 @@ fn build_placeholder() -> impl Widget<()> {
 
 fn build_day_view_work_items() -> impl Widget<state::DayViewWorkItems> {
     Scroll::new(LensWrap::new(
-        List::new(|| build_work_item_widget()),
+        List::new(|| build_work_item_widget().lens(SelectedWorkItemLens)),
         state::DayViewWorkItems::items,
     ))
     .vertical()
+    .with_id(ITEM_LIST_WIDGET_ID)
 }
 
-fn build_work_item_widget() -> impl Widget<Rc<work_item::UiWorkItem>> {
+fn build_work_item_widget() -> impl Widget<UiWorkItem> {
     WorkItemListItemWidget::new()
-        .on_click(|ctx, item_ref, _| {
-            let item = item_ref.as_ref();
-
+        .on_click(|ctx, item, _| {
             ctx.submit_command(
                 controller::SELECT_ITEM
                     .with(item.id)

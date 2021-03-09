@@ -1,4 +1,5 @@
 use druid::{Data, Lens};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 /// Work item displayable in the UI.
@@ -13,7 +14,7 @@ pub struct UiWorkItem {
     /// Tags of the item.
     pub tags: im::Vector<String>,
     /// Reference to the original work item.
-    pub work_item: Rc<persistence::calc::WorkItem>,
+    pub work_item: Rc<RefCell<persistence::calc::WorkItem>>,
 }
 
 #[derive(Clone, Data, PartialEq)]

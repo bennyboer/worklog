@@ -1,5 +1,4 @@
 use crate::state::work_item::{UiWorkItem, UiWorkItemStatus};
-use crate::util::lens::in_rc::InRc;
 use crate::Size;
 use druid::widget::{
     Click, Controller, ControllerHost, CrossAxisAlignment, Flex, Label, LineBreaking, List,
@@ -10,13 +9,13 @@ use druid::{
     LinearGradient, PaintCtx, Point, Rect, RenderContext, Selector, UnitPoint, UpdateCtx, Widget,
     WidgetExt, WidgetId, WidgetPod,
 };
-use std::rc::Rc;
 
 const HOVER_CHANGED: Selector = Selector::new("work-item-header.hover-changed");
+pub(crate) const ITEM_CHANGED: Selector<i32> = Selector::new("work-item.item-changed");
 
 pub(crate) struct WorkItemListItemWidget {
     header_id: WidgetId,
-    child: WidgetPod<Rc<UiWorkItem>, Box<dyn Widget<Rc<UiWorkItem>>>>,
+    child: WidgetPod<UiWorkItem, Box<dyn Widget<UiWorkItem>>>,
 }
 
 impl WorkItemListItemWidget {
@@ -25,12 +24,9 @@ impl WorkItemListItemWidget {
         let item_header = ControllerHost::new(
             ItemHeaderWidget {
                 left: WidgetPod::new(
-                    Label::new(|item: &Rc<UiWorkItem>, _env: &_| {
-                        let work_item = item.as_ref();
-                        format!("{}", work_item.description)
-                    })
-                    .with_text_size(18.0)
-                    .with_line_break_mode(LineBreaking::Clip),
+                    Label::new(|item: &UiWorkItem, _env: &_| format!("{}", item.description))
+                        .with_text_size(18.0)
+                        .with_line_break_mode(LineBreaking::Clip),
                 )
                 .boxed(),
                 right: WidgetPod::new(build_timing_label().padding((10.0, 0.0, 0.0, 0.0))).boxed(),
@@ -52,7 +48,7 @@ impl WorkItemListItemWidget {
                         Flex::row()
                             .with_child(build_status_label())
                             .with_flex_spacer(1.0)
-                            .with_child(build_tags().lens(InRc::new(UiWorkItem::tags))),
+                            .with_child(build_tags().lens(UiWorkItem::tags)),
                     ),
                 1.0,
             )
@@ -68,16 +64,16 @@ impl WorkItemListItemWidget {
     /// Specify a callback to be called when the item has been clicked.
     pub fn on_click(
         self,
-        f: impl Fn(&mut EventCtx, &mut Rc<UiWorkItem>, &Env) + 'static,
-    ) -> ControllerHost<Self, Click<Rc<UiWorkItem>>> {
+        f: impl Fn(&mut EventCtx, &mut UiWorkItem, &Env) + 'static,
+    ) -> ControllerHost<Self, Click<UiWorkItem>> {
         ControllerHost::new(self, Click::new(f))
     }
 }
 
 /// Build the work item timing label.
-fn build_timing_label() -> Label<Rc<UiWorkItem>> {
-    Label::new(|item: &Rc<UiWorkItem>, _: &Env| {
-        let work_item = item.as_ref().work_item.as_ref();
+fn build_timing_label() -> Label<UiWorkItem> {
+    Label::new(|item: &UiWorkItem, _: &Env| {
+        let work_item = item.work_item.as_ref().borrow();
 
         let time_str = shared::time::get_local_date_time(work_item.created_timestamp())
             .format("%H:%M")
@@ -129,13 +125,11 @@ fn rand_color() -> Color {
 }
 
 /// Build the status label of the work item.
-fn build_status_label() -> Label<Rc<UiWorkItem>> {
-    Label::new(|item: &Rc<UiWorkItem>, _env: &_| {
-        let work_item = item.as_ref();
-
+fn build_status_label() -> Label<UiWorkItem> {
+    Label::new(|item: &UiWorkItem, _env: &_| {
         format!(
             "{}",
-            match work_item.status {
+            match item.status {
                 UiWorkItemStatus::InProgress => "In progress",
                 UiWorkItemStatus::Paused => "Paused",
                 UiWorkItemStatus::Finished => "Done",
@@ -147,13 +141,11 @@ fn build_status_label() -> Label<Rc<UiWorkItem>> {
 }
 
 /// Build the status panel that is part of the work item list item widget.
-fn build_status_panel() -> impl Widget<Rc<UiWorkItem>> {
-    Painter::new(|ctx, item: &Rc<UiWorkItem>, _: &_| {
-        let work_item = item.as_ref();
-
+fn build_status_panel() -> impl Widget<UiWorkItem> {
+    Painter::new(|ctx, item: &UiWorkItem, _: &_| {
         let size = ctx.size().to_rounded_rect(2.0);
 
-        let color = match work_item.status {
+        let color = match item.status {
             UiWorkItemStatus::InProgress => Color::rgb8(130, 200, 50),
             UiWorkItemStatus::Paused => Color::rgb8(216, 139, 100),
             UiWorkItemStatus::Finished => Color::rgb8(100, 177, 216),
@@ -164,8 +156,21 @@ fn build_status_panel() -> impl Widget<Rc<UiWorkItem>> {
     .fix_width(4.0)
 }
 
-impl Widget<Rc<UiWorkItem>> for WorkItemListItemWidget {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Rc<UiWorkItem>, env: &Env) {
+impl Widget<UiWorkItem> for WorkItemListItemWidget {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut UiWorkItem, env: &Env) {
+        match event {
+            Event::Command(cmd) => {
+                if cmd.is(ITEM_CHANGED) {
+                    if let Some(item_id) = cmd.get(ITEM_CHANGED) {
+                        if data.id == *item_id {
+                            ctx.request_update();
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
         self.child.event(ctx, event, data, env);
     }
 
@@ -173,7 +178,7 @@ impl Widget<Rc<UiWorkItem>> for WorkItemListItemWidget {
         &mut self,
         ctx: &mut LifeCycleCtx,
         event: &LifeCycle,
-        data: &Rc<UiWorkItem>,
+        data: &UiWorkItem,
         env: &Env,
     ) {
         if let LifeCycle::HotChanged(_) = event {
@@ -187,8 +192,8 @@ impl Widget<Rc<UiWorkItem>> for WorkItemListItemWidget {
     fn update(
         &mut self,
         ctx: &mut UpdateCtx,
-        _old_data: &Rc<UiWorkItem>,
-        data: &Rc<UiWorkItem>,
+        _old_data: &UiWorkItem,
+        data: &UiWorkItem,
         env: &Env,
     ) {
         self.child.update(ctx, data, env);
@@ -198,13 +203,13 @@ impl Widget<Rc<UiWorkItem>> for WorkItemListItemWidget {
         &mut self,
         ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        data: &Rc<UiWorkItem>,
+        data: &UiWorkItem,
         env: &Env,
     ) -> Size {
         self.child.layout(ctx, bc, data, env)
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &Rc<UiWorkItem>, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &UiWorkItem, env: &Env) {
         let is_hot = ctx.is_hot();
         let size = ctx.size().to_rounded_rect(2.0);
 
@@ -215,13 +220,13 @@ impl Widget<Rc<UiWorkItem>> for WorkItemListItemWidget {
 }
 
 struct ItemHeaderWidget {
-    left: WidgetPod<Rc<UiWorkItem>, Box<dyn Widget<Rc<UiWorkItem>>>>,
-    right: WidgetPod<Rc<UiWorkItem>, Box<dyn Widget<Rc<UiWorkItem>>>>,
+    left: WidgetPod<UiWorkItem, Box<dyn Widget<UiWorkItem>>>,
+    right: WidgetPod<UiWorkItem, Box<dyn Widget<UiWorkItem>>>,
     hovered: bool,
 }
 
-impl Widget<Rc<UiWorkItem>> for ItemHeaderWidget {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Rc<UiWorkItem>, env: &Env) {
+impl Widget<UiWorkItem> for ItemHeaderWidget {
+    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut UiWorkItem, env: &Env) {
         self.left.event(ctx, event, data, env);
         self.right.event(ctx, event, data, env);
     }
@@ -230,7 +235,7 @@ impl Widget<Rc<UiWorkItem>> for ItemHeaderWidget {
         &mut self,
         ctx: &mut LifeCycleCtx,
         event: &LifeCycle,
-        data: &Rc<UiWorkItem>,
+        data: &UiWorkItem,
         env: &Env,
     ) {
         self.left.lifecycle(ctx, event, data, env);
@@ -240,8 +245,8 @@ impl Widget<Rc<UiWorkItem>> for ItemHeaderWidget {
     fn update(
         &mut self,
         ctx: &mut UpdateCtx,
-        _old_data: &Rc<UiWorkItem>,
-        data: &Rc<UiWorkItem>,
+        _old_data: &UiWorkItem,
+        data: &UiWorkItem,
         env: &Env,
     ) {
         self.left.update(ctx, data, env);
@@ -252,7 +257,7 @@ impl Widget<Rc<UiWorkItem>> for ItemHeaderWidget {
         &mut self,
         ctx: &mut LayoutCtx,
         bc: &BoxConstraints,
-        data: &Rc<UiWorkItem>,
+        data: &UiWorkItem,
         env: &Env,
     ) -> Size {
         // First layout right item
@@ -272,7 +277,7 @@ impl Widget<Rc<UiWorkItem>> for ItemHeaderWidget {
         Size::new(bc.max().width, left_size.height.max(right_size.height))
     }
 
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &Rc<UiWorkItem>, env: &Env) {
+    fn paint(&mut self, ctx: &mut PaintCtx, data: &UiWorkItem, env: &Env) {
         self.left.paint(ctx, data, env);
         self.right.paint(ctx, data, env);
 
@@ -302,13 +307,13 @@ impl Widget<Rc<UiWorkItem>> for ItemHeaderWidget {
 
 struct ItemHeaderWidgetController;
 
-impl Controller<Rc<UiWorkItem>, ItemHeaderWidget> for ItemHeaderWidgetController {
+impl Controller<UiWorkItem, ItemHeaderWidget> for ItemHeaderWidgetController {
     fn event(
         &mut self,
         child: &mut ItemHeaderWidget,
         ctx: &mut EventCtx,
         event: &Event,
-        data: &mut Rc<UiWorkItem>,
+        data: &mut UiWorkItem,
         env: &Env,
     ) {
         match event {
