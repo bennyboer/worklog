@@ -1,4 +1,4 @@
-use crate::state::work_item::UiWorkItem;
+use crate::state::work_item::{UiWorkItem, UiWorkItemStatus};
 use crate::state::{DayViewState, SelectedWorkItemLens};
 use crate::util::icon;
 use crate::widget::button::UiButton;
@@ -7,6 +7,7 @@ use crate::widget::day_view::work_item::{WorkItemListItemWidget, ITEM_CHANGED};
 use crate::widget::editable_field::EditableFieldWidget;
 use crate::widget::sidebar::{SideBar, OPEN_SIDEBAR};
 use crate::widget::stack::Stack;
+use crate::widget::when::When;
 use crate::{state, Size};
 use druid::widget::{
     ControllerHost, CrossAxisAlignment, Flex, IdentityWrapper, Label, LensWrap, LineBreaking, List,
@@ -85,12 +86,13 @@ fn build_detail_view_wrapper() -> impl Widget<Option<Rc<RefCell<UiWorkItem>>>> {
 }
 
 fn build_detail_view() -> impl Widget<UiWorkItem> {
-    Padding::new(
+    Scroll::new(Padding::new(
         10.0,
         Flex::column()
             .main_axis_alignment(MainAxisAlignment::Start)
             .cross_axis_alignment(CrossAxisAlignment::Start)
             .with_child(build_detail_view_title())
+            .with_child(build_detail_view_status())
             .with_child(Label::new(|data: &UiWorkItem, _: &Env| {
                 let work_item = data.work_item.as_ref().borrow();
 
@@ -98,13 +100,100 @@ fn build_detail_view() -> impl Widget<UiWorkItem> {
                     "Duration: {}",
                     shared::time::format_duration((work_item.time_taken() / 1000) as u32)
                 )
-            }))
-            .with_child(UiButton::new(Label::new("Hello World")))
-            .with_child(Label::new("More details about the work item go here...")),
-    )
+            })),
+    ))
+    .vertical()
     .background(Color::WHITE)
     .fix_width(400.0)
     .expand_height()
+}
+
+fn build_detail_view_status() -> impl Widget<UiWorkItem> {
+    Flex::row()
+        .cross_axis_alignment(CrossAxisAlignment::Center)
+        .with_child(
+            Label::new("Status: ")
+                .with_text_size(18.0)
+                .with_text_color(Color::rgb8(120, 120, 120)),
+        )
+        .with_child(
+            Label::new(|data: &UiWorkItem, _: &Env| {
+                format!(
+                    "{}",
+                    match data.status {
+                        UiWorkItemStatus::InProgress => "In progress",
+                        UiWorkItemStatus::Paused => "Paused",
+                        UiWorkItemStatus::Finished => "Done",
+                    }
+                )
+            })
+            .with_text_size(18.0),
+        )
+        .with_flex_spacer(1.0)
+        .with_child(build_detail_view_status_buttons())
+}
+
+fn build_detail_view_status_buttons() -> impl Widget<UiWorkItem> {
+    Flex::row()
+        .with_child(When::new(
+            |data: &UiWorkItem| data.status == UiWorkItemStatus::InProgress,
+            UiButton::new(Label::new("Pause").padding((4.0, 2.0)))
+                .with_color(Color::rgb8(255, 179, 102))
+                .on_click(|ctx, data: &mut UiWorkItem, _| {
+                    // Update UI work item
+                    data.status = UiWorkItemStatus::Paused;
+
+                    // Update work item in backend
+                    let mut work_item = data.work_item.borrow_mut();
+                    work_item.pause_working().unwrap();
+                    persistence::update_items(vec![&work_item]).unwrap();
+
+                    // Notify list item that it needs to update as well
+                    ctx.submit_command(ITEM_CHANGED.with(data.id).to(ITEM_LIST_WIDGET_ID));
+
+                    ctx.request_update();
+                }),
+        ))
+        .with_spacer(4.0)
+        .with_child(When::new(
+            |data: &UiWorkItem| data.status == UiWorkItemStatus::Paused,
+            UiButton::new(Label::new("Continue").padding((4.0, 2.0)))
+                .with_color(Color::rgb8(102, 204, 153))
+                .on_click(|ctx, data: &mut UiWorkItem, _| {
+                    // Update UI work item
+                    data.status = UiWorkItemStatus::InProgress;
+
+                    // Update work item in backend
+                    let mut work_item = data.work_item.borrow_mut();
+                    work_item.continue_working().unwrap();
+                    persistence::update_items(vec![&work_item]).unwrap();
+
+                    // Notify list item that it needs to update as well
+                    ctx.submit_command(ITEM_CHANGED.with(data.id).to(ITEM_LIST_WIDGET_ID));
+
+                    ctx.request_update();
+                }),
+        ))
+        .with_spacer(4.0)
+        .with_child(When::new(
+            |data: &UiWorkItem| data.status != UiWorkItemStatus::Finished,
+            UiButton::new(Label::new("Finish").padding((4.0, 2.0)))
+                .with_color(Color::rgb8(140, 140, 140))
+                .on_click(|ctx, data: &mut UiWorkItem, _| {
+                    // Update UI work item
+                    data.status = UiWorkItemStatus::Finished;
+
+                    // Update work item in backend
+                    let mut work_item = data.work_item.borrow_mut();
+                    work_item.finish_working(None).unwrap();
+                    persistence::update_items(vec![&work_item]).unwrap();
+
+                    // Notify list item that it needs to update as well
+                    ctx.submit_command(ITEM_CHANGED.with(data.id).to(ITEM_LIST_WIDGET_ID));
+
+                    ctx.request_update();
+                }),
+        ))
 }
 
 fn build_detail_view_title() -> impl Widget<UiWorkItem> {
@@ -113,9 +202,11 @@ fn build_detail_view_title() -> impl Widget<UiWorkItem> {
     let non_editing_widget = Label::new(|data: &UiWorkItem, _: &Env| data.description.to_owned())
         .with_line_break_mode(LineBreaking::WordWrap)
         .with_text_size(20.0)
+        .padding(2.0)
         .expand_width();
 
     let editing_widget = TextBox::multiline()
+        .with_text_size(20.0)
         .lens(UiWorkItem::description)
         .expand_width();
 

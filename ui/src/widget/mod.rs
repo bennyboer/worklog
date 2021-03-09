@@ -4,3 +4,4 @@ pub(crate) mod editable_field;
 pub(crate) mod sidebar;
 pub(crate) mod stack;
 pub(crate) mod util;
+pub(crate) mod when;

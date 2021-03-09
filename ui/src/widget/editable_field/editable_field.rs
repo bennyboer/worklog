@@ -73,13 +73,15 @@ impl<T: Data> Widget<T> for EditableFieldWidget<T> {
             Event::Command(cmd) => {
                 match cmd.get(EDIT_MODE_CHANGE) {
                     Some(edit_mode) => {
-                        if *edit_mode != self.is_editing {
-                            if !*edit_mode {
+                        let edit_mode = *edit_mode;
+
+                        if edit_mode != self.is_editing {
+                            if !edit_mode {
                                 // Leave edit mode -> Update value
                                 (self.on_update_action)(ctx, data, env);
                             }
 
-                            self.is_editing = *edit_mode;
+                            self.is_editing = edit_mode;
 
                             ctx.request_update();
                             ctx.request_layout();

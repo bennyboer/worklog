@@ -17,7 +17,7 @@ pub struct UiWorkItem {
     pub work_item: Rc<RefCell<persistence::calc::WorkItem>>,
 }
 
-#[derive(Clone, Data, PartialEq)]
+#[derive(Clone, Data, PartialEq, Debug)]
 pub enum UiWorkItemStatus {
     InProgress,
     Paused,

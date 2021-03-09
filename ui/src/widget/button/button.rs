@@ -5,6 +5,8 @@ use druid::{
     PaintCtx, RenderContext, UpdateCtx, Widget, WidgetPod,
 };
 
+const DEFAULT_COLOR: Color = Color::rgb8(220, 225, 230);
+
 /// Custom button that may take another widget to display as child.
 pub struct UiButton<T> {
     /// Corner radius of the button.
@@ -23,18 +25,36 @@ impl<T: Data> UiButton<T> {
     /// Create a new UiButton instance
     /// with the given child widget.
     pub fn new(child: impl Widget<T> + 'static) -> UiButton<T> {
-        UiButton {
+        let button = UiButton {
             corner_radius: 4.0,
-            active_color: Color::rgb8(210, 215, 220),
-            hover_color: Color::rgb8(230, 235, 240),
-            color: Color::rgb8(220, 225, 230),
+            active_color: DEFAULT_COLOR,
+            hover_color: DEFAULT_COLOR,
+            color: DEFAULT_COLOR,
             child: WidgetPod::new(child).boxed(),
-        }
+        };
+
+        button.with_color(DEFAULT_COLOR)
     }
 
     /// Set a custom corner radius.
     pub fn with_corner_radius(mut self, radius: f64) -> Self {
         self.corner_radius = radius;
+
+        self
+    }
+
+    /// Set a custom active color.
+    pub fn with_color(mut self, color: Color) -> Self {
+        let (red, green, blue, alpha) = color.as_rgba();
+
+        self.color = color;
+        self.active_color = Color::rgba(red * 0.9, green * 0.9, blue * 0.9, alpha);
+        self.hover_color = Color::rgba(
+            (red * 1.05).min(1.0),
+            (green * 1.05).min(1.0),
+            (blue * 1.05).min(1.0),
+            alpha,
+        );
 
         self
     }
