@@ -4,5 +4,6 @@ pub(crate) mod editable_field;
 pub(crate) mod horizontal_separator;
 pub(crate) mod sidebar;
 pub(crate) mod stack;
+pub(crate) mod tag_cloud;
 pub(crate) mod util;
 pub(crate) mod when;

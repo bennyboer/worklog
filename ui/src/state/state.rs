@@ -118,6 +118,7 @@ fn load_work_items(
             },
             tags: im::Vector::from(item.tags()),
             work_item: Rc::new(RefCell::new(item)),
+            tmp: String::new(),
         })));
     }
 

@@ -81,6 +81,11 @@ impl WorkItem {
         self.tags.insert(tag);
     }
 
+    /// Pop a tag from the work item.
+    pub fn pop_tag(&mut self, tag: &String) {
+        self.tags.remove(tag);
+    }
+
     /// Get the time the user has been working on the work item (in milliseconds).
     pub fn time_taken(&self) -> i64 {
         let mut time_taken: i64 = 0;

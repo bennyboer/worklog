@@ -8,6 +8,7 @@ use crate::widget::editable_field::EditableFieldWidget;
 use crate::widget::horizontal_separator::HorizontalSeparator;
 use crate::widget::sidebar::{SideBar, OPEN_SIDEBAR};
 use crate::widget::stack::Stack;
+use crate::widget::tag_cloud::TagCloud;
 use crate::widget::when::When;
 use crate::{state, Size};
 use druid::widget::{
@@ -99,6 +100,23 @@ fn build_detail_view() -> impl Widget<UiWorkItem> {
                     .padding((100.0, 10.0)),
             )
             .with_child(build_detail_view_status())
+            .with_child(
+                HorizontalSeparator::new(4.0, Color::rgb(0.9, 0.9, 0.9))
+                    .lens(lens::Unit)
+                    .padding((100.0, 10.0)),
+            )
+            .with_child(
+                Label::new("Tags")
+                    .with_text_size(20.0)
+                    .center()
+                    .padding((0.0, 0.0, 0.0, 10.0)),
+            )
+            .with_child(build_detail_view_tags())
+            .with_child(
+                HorizontalSeparator::new(4.0, Color::rgb(0.9, 0.9, 0.9))
+                    .lens(lens::Unit)
+                    .padding((100.0, 10.0)),
+            )
             .with_child(Label::new(|data: &UiWorkItem, _: &Env| {
                 let work_item = data.work_item.as_ref().borrow();
 
@@ -106,8 +124,7 @@ fn build_detail_view() -> impl Widget<UiWorkItem> {
                     "Duration: {}",
                     shared::time::format_duration((work_item.time_taken() / 1000) as u32)
                 )
-            }))
-            .with_child(build_detail_view_tags().lens(UiWorkItem::tags)),
+            })),
     ))
     .vertical()
     .background(Color::WHITE)
@@ -115,43 +132,10 @@ fn build_detail_view() -> impl Widget<UiWorkItem> {
     .expand_height()
 }
 
-fn build_detail_view_tags() -> impl Widget<im::Vector<String>> {
-    // TODO: Build Tag cloud instead
-    List::new(|| build_tag_widget())
-        .horizontal()
-        .with_spacing(2.0)
-}
-
-/// Build a widget representing a tag.
-fn build_tag_widget() -> impl Widget<String> {
-    let tag_color = rand_color(); // TODO: Use fixed color per tag instead
-
-    Label::new(|text: &String, _: &Env| format!("#{}", text))
-        .with_text_color(invert_color(&tag_color))
-        .with_text_size(11.0)
-        .padding((3.0, 1.0))
-        .background(tag_color)
-        .rounded(100.0)
-}
-
-fn invert_color(color: &Color) -> Color {
-    let (red, green, blue, _) = color.as_rgba();
-    let sum = red + green + blue;
-
-    if sum < 1.5 {
-        Color::WHITE
-    } else {
-        Color::BLACK
-    }
-}
-
-fn rand_color() -> Color {
-    Color::rgb(
-        rand::random::<f64>(),
-        rand::random::<f64>(),
-        rand::random::<f64>(),
-    )
-    .with_alpha(0.4)
+fn build_detail_view_tags() -> impl Widget<UiWorkItem> {
+    TagCloud::new(|ctx, data| {
+        ctx.submit_command(ITEM_CHANGED.with(data.id).to(ITEM_LIST_WIDGET_ID))
+    })
 }
 
 fn build_detail_view_status() -> impl Widget<UiWorkItem> {

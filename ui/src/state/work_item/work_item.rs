@@ -15,6 +15,8 @@ pub struct UiWorkItem {
     pub tags: im::Vector<String>,
     /// Reference to the original work item.
     pub work_item: Rc<RefCell<persistence::calc::WorkItem>>,
+    /// Temporary string used for example to add a new tag to the tag list.
+    pub tmp: String,
 }
 
 #[derive(Clone, Data, PartialEq, Debug)]
